@@ -205,7 +205,7 @@ module Clacky
         "endpoint_variants" => [
           { "label" => "Primary (Global)",  "label_key" => "settings.models.baseurl.variant.openclacky_primary",   "base_url" => "https://api.openclacky.com" }.freeze
         ].freeze,
-        "website_url" => "https://www.openclacky.com/ai-keys"
+        "website_url" => "https://www.openclacky.com/llm_keys"
       }.freeze,
 
 

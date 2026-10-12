@@ -8227,6 +8227,8 @@ module Clacky
           if e.is_a?(Clacky::InsufficientCreditError) && e.provider_id
             preset = Clacky::Providers::PRESETS[e.provider_id]
             top_up_url = preset && preset["website_url"]
+          elsif e.respond_to?(:action_url) && e.action_url
+            top_up_url = e.action_url
           end
           user_message = e.respond_to?(:display_message) && e.display_message ? e.display_message : e.message
           raw_message  = e.respond_to?(:raw_message) ? e.raw_message : nil

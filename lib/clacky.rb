@@ -179,11 +179,12 @@ Clacky::ExtensionHookLoader.load_all
 module Clacky
   class AgentInterrupted < Exception; end  # Inherit from Exception to bypass rescue StandardError
   class AgentError < StandardError
-    attr_reader :raw_message
+    attr_reader :raw_message, :action_url
 
-    def initialize(message, raw_message: nil)
+    def initialize(message, raw_message: nil, action_url: nil)
       super(message)
       @raw_message = raw_message
+      @action_url = action_url
     end
   end
   class BadRequestError < AgentError

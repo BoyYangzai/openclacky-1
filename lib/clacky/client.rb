@@ -56,6 +56,13 @@ module Clacky
       @read_timeout = read_timeout
     end
 
+    # Console URL where the user can inspect credit / API key state. nil when
+    # the provider has no preset (custom base_url).
+    def account_url
+      preset = Providers.get(@provider_id)
+      preset && preset["website_url"]
+    end
+
     # Returns true when the client is using the AWS Bedrock Converse API.
     def bedrock?
       @use_bedrock

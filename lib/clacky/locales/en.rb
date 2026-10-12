@@ -22,7 +22,7 @@ module Clacky
       "llm.error.html_response"         => "Service temporarily unavailable (received HTML error page), retrying...",
       "llm.error.bad_request"           => "Model request failed. Please switch to another model and retry",
       "llm.error.request_timeout"       => "Request timed out after %<retries>d retries",
-      "llm.error.network_failed"        => "Network connection failed after %<retries>d retries",
+      "llm.error.network_failed"        => "Network connection failed after %<retries>d retries. If the problem persists, check your account balance or API Key",
       "llm.error.service_unavailable"   => "Service unavailable after %<retries>d retries",
       "platform.error.invalid_proof"        => "Invalid license key — please check and try again.",
       "platform.error.invalid_signature"    => "Invalid request signature.",

@@ -71,6 +71,7 @@ RSpec.describe "Broken pipe (Errno::EPIPE) recovery in LlmCaller" do
       allow(c).to receive(:supports_prompt_caching?).and_return(false)
       allow(c).to receive(:format_tool_results).and_return([])
       allow(c).to receive(:reset_connections!)
+      allow(c).to receive(:account_url).and_return("https://example.com/keys")
     end
   end
 
@@ -121,7 +122,10 @@ RSpec.describe "Broken pipe (Errno::EPIPE) recovery in LlmCaller" do
         .and_raise(Errno::EPIPE, "Broken pipe")
 
       expect { agent.run("hello") }
-        .to raise_error(Clacky::AgentError, /Network connection failed after \d+ retries/)
+        .to raise_error(Clacky::AgentError, /Network connection failed after \d+ retries/) { |error|
+          expect(error.raw_message).to include("Broken pipe")
+          expect(error.action_url).to eq("https://example.com/keys")
+        }
     end
   end
 

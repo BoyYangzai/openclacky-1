@@ -247,7 +247,7 @@ module Clacky
           else
             # Don't show_error here — let the outer rescue block handle it to avoid duplicates.
             # Progress cleanup is the caller's responsibility (via its own ensure block).
-            raise AgentError.new("#{I18n.t("llm.error.network_failed", retries: max_retries)}", raw_message: e.message)
+            raise AgentError.new("#{I18n.t("llm.error.network_failed", retries: max_retries)}", raw_message: e.message, action_url: @client.account_url)
           end
 
         rescue RetryableError => e
