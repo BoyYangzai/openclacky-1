@@ -3273,7 +3273,7 @@ body {
   height: 2rem;
   border: 1px solid var(--color-border-primary);
   background: var(--color-bg-secondary);
-  color: var(--color-text-secondary);
+  color: var(--color-text-tertiary);
   border-radius: var(--radius-sm);
   cursor: pointer;
   box-shadow: var(--shadow-sm, 0 2px 8px rgba(0,0,0,0.06));
