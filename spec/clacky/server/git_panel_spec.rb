@@ -5,18 +5,46 @@ require "tmpdir"
 require "fileutils"
 require "clacky/server/git_panel"
 
+# git runs auto maintenance in a detached background process after commit. It
+# keeps writing into .git while Dir.mktmpdir tears the repo down, which makes
+# the teardown fail with ENOTEMPTY on the slower CI runners. Disable it per
+# repo and retry the removal, so a stray background git cannot fail the suite.
+module GitPanelRepo
+  def init_repo(dir)
+    @dir = dir
+    run "git", "init", "-q"
+    run "git", "config", "user.email", "spec@example.com"
+    run "git", "config", "user.name", "Spec"
+    run "git", "config", "gc.auto", "0"
+    run "git", "config", "maintenance.auto", "false"
+  end
+
+  def remove_repo(dir)
+    deadline = Time.now + 5
+    begin
+      FileUtils.remove_entry(dir)
+    rescue SystemCallError
+      raise if Time.now > deadline
+      sleep 0.1
+      retry
+    end
+  end
+end
+
 # Specs for GitPanel.diff - the endpoint behind the Changes panel's per-file
 # diff view. The interesting cases are the baselines: diffs run against HEAD
 # (not the index) so staged edits stay visible, and untracked files diff
 # against /dev/null via --no-index so a brand-new file renders as additions.
 RSpec.describe Clacky::Server::GitPanel, ".diff" do
+  include GitPanelRepo
+
   around do |ex|
-    Dir.mktmpdir("git_panel_spec") do |dir|
-      @dir = dir
-      run "git", "init", "-q"
-      run "git", "config", "user.email", "spec@example.com"
-      run "git", "config", "user.name", "Spec"
+    dir = Dir.mktmpdir("git_panel_spec")
+    begin
+      init_repo(dir)
       ex.run
+    ensure
+      remove_repo(dir)
     end
   end
 
@@ -107,13 +135,15 @@ end
 # octal-escapes non-ASCII paths unless core.quotePath is off, which would
 # surface as unreadable names in the panel.
 RSpec.describe Clacky::Server::GitPanel, ".status" do
+  include GitPanelRepo
+
   around do |ex|
-    Dir.mktmpdir("git_panel_status_spec") do |dir|
-      @dir = dir
-      run "git", "init", "-q"
-      run "git", "config", "user.email", "spec@example.com"
-      run "git", "config", "user.name", "Spec"
+    dir = Dir.mktmpdir("git_panel_status_spec")
+    begin
+      init_repo(dir)
       ex.run
+    ensure
+      remove_repo(dir)
     end
   end
 
@@ -148,13 +178,15 @@ RSpec.describe Clacky::Server::GitPanel, ".status" do
 end
 
 RSpec.describe Clacky::Server::GitPanel, ".restore" do
+  include GitPanelRepo
+
   around do |ex|
-    Dir.mktmpdir("git_panel_restore_spec") do |dir|
-      @dir = dir
-      run "git", "init", "-q"
-      run "git", "config", "user.email", "spec@example.com"
-      run "git", "config", "user.name", "Spec"
+    dir = Dir.mktmpdir("git_panel_restore_spec")
+    begin
+      init_repo(dir)
       ex.run
+    ensure
+      remove_repo(dir)
     end
   end
 
