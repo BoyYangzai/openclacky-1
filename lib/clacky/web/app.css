@@ -6231,7 +6231,7 @@ body {
 .sib-model-option .sib-model-name.has-sub {
   flex-direction: column;
   align-items: stretch;
-  gap: 0.1875rem;
+  gap: 0.375rem;
 }
 /* Lead line of a row: the provider the model runs through (or the model name
    on rows with no provider), so it carries the weight. */
