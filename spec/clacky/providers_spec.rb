@@ -91,11 +91,6 @@ RSpec.describe Clacky::Providers do
                                          model_name: "oc-glm-5.3")).to be false
       end
 
-      it "returns false for openclacky + oc-minimax-m2.7 (upstream silently drops images)" do
-        expect(described_class.supports?("openclacky", :vision,
-                                         model_name: "oc-minimax-m2.7")).to be false
-      end
-
       it "returns true for openclacky + oc-kimi-k3 (natively multimodal)" do
         expect(described_class.supports?("openclacky", :vision,
                                          model_name: "oc-kimi-k3")).to be true
@@ -918,7 +913,6 @@ RSpec.describe Clacky::Providers do
     end
 
     it "returns 65_536 for MiniMax M2.7 models" do
-      expect(described_class.max_output_for("oc-minimax-m2.7")).to eq(65_536)
       # The upstream ceiling is 196_608, but the BYOK id gets the same 64K cap.
       expect(described_class.max_output_for("MiniMax-M2.7")).to eq(65_536)
     end

@@ -40,7 +40,6 @@ module Clacky
           "dsk-deepseek-v4-pro",
           "oc-glm-5.3",
           "oc-kimi-k3",
-          "oc-minimax-m2.7",
           "abs-claude-fable-5-1",
           "abs-claude-fable-5",
           "abs-claude-opus-5-5",
@@ -148,15 +147,11 @@ module Clacky
         # (it accepts image/audio/video input natively via OpenRouter).
         # oc-glm-5.3 is likewise text-only: its upstream rejects any content
         # block other than `type: "text"`, so images must never be sent
-        # inline. oc-minimax-m2.7 is also text-only, but its upstream accepts
-        # the image block and silently ignores it — a worse failure mode,
-        # since the model then answers as if no image had been attached.
-        # oc-kimi-k3 is natively multimodal and keeps vision=true.
+        # inline. oc-kimi-k3 is natively multimodal and keeps vision=true.
         "model_capabilities" => {
           "dsk-deepseek-flash"  => { "vision" => true }.freeze,
           "dsk-deepseek-v4-pro" => { "vision" => false }.freeze,
-          "oc-glm-5.3"          => { "vision" => false }.freeze,
-          "oc-minimax-m2.7"      => { "vision" => false }.freeze
+          "oc-glm-5.3"          => { "vision" => false }.freeze
         }.freeze,
         # Bedrock GPT models (abs-gpt-*) are served through the OpenAI
         # Responses API — their Chat Completions endpoint rejects function

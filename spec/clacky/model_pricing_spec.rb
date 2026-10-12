@@ -902,9 +902,6 @@ RSpec.describe Clacky::ModelPricing do
         .to be_within(0.001).of(4.8849)
       expect(described_class.calculate_cost(model: "oc-kimi-k3", usage: usage)[:cost])
         .to be_within(0.001).of(17.10)
-      # MiniMax M2.7 lists at $0.30 / $1.20, the cheapest of the three.
-      expect(described_class.calculate_cost(model: "oc-minimax-m2.7", usage: usage)[:cost])
-        .to be_within(0.001).of(1.425)
     end
 
     it "leaves the BYOK ids sitting behind those same models at list price" do
@@ -924,7 +921,6 @@ RSpec.describe Clacky::ModelPricing do
       expect(described_class.discount_rate("claude-opus-5-5")).to eq(1.0)
       expect(described_class.discount_rate("oc-glm-5.3")).to eq(0.95)
       expect(described_class.discount_rate("oc-kimi-k3")).to eq(0.95)
-      expect(described_class.discount_rate("oc-minimax-m2.7")).to eq(0.95)
       expect(described_class.discount_rate("glm-5.3")).to eq(1.0)
       expect(described_class.discount_rate("kimi-k3")).to eq(1.0)
       expect(described_class.discount_rate("minimax-m2.7")).to eq(1.0)
