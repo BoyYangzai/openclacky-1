@@ -5887,9 +5887,11 @@ body {
   margin-left: 0.5rem;
   opacity: 0.8;
 }
+/* Same tokens as .sib-submodel-default-tag: the dropdown's "default" badge and
+   the variant panel's tag say the same word, so they wear one color. */
 .sib-model-option .model-badge.default {
-  background: var(--color-success-bg);
-  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-text-secondary) 15%, transparent);
+  color: var(--color-text-secondary);
 }
 .sib-model-option .model-badge.lite {
   background: color-mix(in srgb, var(--color-accent-primary) 10%, transparent);
@@ -5950,7 +5952,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 .sib-submodel-toggle:hover {
   background: color-mix(in srgb, var(--color-accent-primary) 15%, transparent);
@@ -5973,6 +5975,22 @@ body {
 }
 .sib-submodel-toggle svg {
   transition: transform 0.18s ease;
+}
+
+/* The switcher is an affordance, not information: every row can offer one
+   (each row knows its provider's models), so it stays out of the way until the
+   row is reached. The selected row keeps it visible — it marks that the
+   session already runs a variant. */
+.sib-model-option .sib-submodel-toggle {
+  opacity: 0;
+  pointer-events: none;
+}
+.sib-model-option:hover .sib-submodel-toggle,
+.sib-model-option.current .sib-submodel-toggle,
+.sib-model-option.submodel-open .sib-submodel-toggle,
+.sib-model-option .sib-submodel-toggle:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sib-model-option.submodel-open {
@@ -6045,36 +6063,6 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* ── Model picker header ───────────────────────────────────────────────────
-   The dropdown lists models from every provider, so the header states which
-   provider and model are live — otherwise the rows read as a provider chooser.
-   It scrolls away with the list; .sib-model-bench below is the sticky row. */
-.sib-picker-head {
-  padding: 0.5rem 0.875rem 0.4375rem;
-  border-bottom: 1px solid var(--color-border-primary);
-}
-.sib-picker-title {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  color: var(--color-text-primary);
-}
-.sib-picker-sub {
-  margin-top: 0.1875rem;
-  font-size: 0.625rem;
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.sib-picker-sub-value {
-  font-family: var(--font-mono, monospace);
-  color: var(--color-text-primary);
-}
-.sib-picker-sub-sep {
-  padding: 0 0.3125rem;
-  color: var(--color-text-tertiary);
 }
 
 /* ── Model switcher benchmark banner & latency column ──────────────────────
@@ -6244,6 +6232,8 @@ body {
   align-items: stretch;
   gap: 0.1875rem;
 }
+/* Lead line of a row: the provider the model runs through (or the model name
+   on rows with no provider), so it carries the weight. */
 .sib-model-option .sib-model-name-main {
   display: inline-flex;
   align-items: center;
@@ -6251,6 +6241,7 @@ body {
   overflow: hidden;
   flex: 0 1 auto;
   min-width: 0;
+  font-weight: 500;
 }
 .sib-model-option .sib-model-name-text {
   overflow: hidden;
@@ -6306,15 +6297,25 @@ body {
   fill: initial;
 }
 .sib-model-option .sib-model-name-sub {
-  /* Indent past the vendor badge so it lines up with the model name. */
-  padding-left: 1.5rem;
+  /* Detail line under the provider: vendor mark + model name (+ remark), so it
+     starts at the row's left edge instead of indenting past the badge. */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
   font-size: 0.6875rem;
   color: var(--color-text-secondary);
-  opacity: 0.75;
+  overflow: hidden;
+  max-width: 100%;
+}
+/* The selected row accents its provider line only; the model stays a detail. */
+.sib-model-option.current .sib-model-name-sub .sib-model-name-text {
+  color: var(--color-text-secondary);
+}
+.sib-model-option .sib-model-name-remark {
+  color: var(--color-text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 100%;
 }
 .sib-model-option .sib-model-name-override {
   font-size: 0.6875rem;
@@ -6330,6 +6331,36 @@ body {
   align-items: center;
   gap: 0.5rem;
   flex-shrink: 0;
+}
+/* Per-row shortcut to the provider's own console (top up / manage the key).
+   Revealed on hover or keyboard focus so it never competes with the model name.
+   Opacity rather than display, so revealing it cannot shift the rest of the row;
+   pointer-events follow the same states so an invisible chip stays unclickable. */
+.sib-model-option .sib-topup-btn {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  padding: 1px 0.4375rem;
+  font-size: 0.5625rem;
+  font-family: inherit;
+  line-height: 1.6;
+  border: 1px solid color-mix(in srgb, var(--color-accent-primary) 40%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-accent-primary) 8%, transparent);
+  color: var(--color-accent-primary);
+  text-decoration: none;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.sib-model-option:hover .sib-topup-btn,
+.sib-model-option .sib-topup-btn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sib-model-option .sib-topup-btn:hover {
+  background: color-mix(in srgb, var(--color-accent-primary) 16%, transparent);
 }
 .sib-model-price {
   font-size: 0.625rem;

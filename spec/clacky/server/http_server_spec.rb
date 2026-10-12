@@ -706,6 +706,45 @@ RSpec.describe Clacky::Server::HttpServer do
       end
     end
 
+    # The picker's per-row top-up shortcut links to the provider's own console,
+    # where the balance is topped up and the key is managed.
+    it "passes through the provider website url for the top-up shortcut" do
+      agent_config.models[0]["base_url"] = "https://api.openclacky.com"
+      with_server(agent_config: agent_config) do |server|
+        req = fake_req(method: "GET", path: "/api/config")
+        res = fake_res
+        dispatch(server, req, res)
+
+        m = parsed_body(res)["models"].first
+        expect(m["website_url"]).to eq("https://www.openclacky.com/llm_keys")
+      end
+    end
+
+    it "sends each row the sub-model list of its provider" do
+      agent_config.models[0]["provider_id"] = "deepseekv4"
+      with_server(agent_config: agent_config) do |server|
+        req = fake_req(method: "GET", path: "/api/config")
+        res = fake_res
+        dispatch(server, req, res)
+
+        m = parsed_body(res)["models"].first
+        expect(m["sub_models"]).to eq(Clacky::Providers.models("deepseekv4"))
+        expect(m["sub_models"]).not_to be_empty
+      end
+    end
+
+    it "sends an empty sub-model list for endpoints without a known provider" do
+      agent_config.models[0]["provider_id"] = nil
+      agent_config.models[0]["base_url"] = "https://llm.internal.example/v1"
+      with_server(agent_config: agent_config) do |server|
+        req = fake_req(method: "GET", path: "/api/config")
+        res = fake_res
+        dispatch(server, req, res)
+
+        expect(parsed_body(res)["models"].first["sub_models"]).to eq([])
+      end
+    end
+
     it "passes through the preset i18n key when the provider has one" do
       agent_config.models[0]["provider_id"] = "volcengine-ark"
       with_server(agent_config: agent_config) do |server|

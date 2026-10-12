@@ -6468,9 +6468,17 @@ module Clacky
             provider_id:       m["provider_id"],
             provider_name:     provider && provider["name"],
             provider_name_key: provider && provider["name_key"],
+            # Where the row's provider manages keys / billing — the picker
+            # links to it from the per-row top-up shortcut.
+            website_url:       provider && provider["website_url"],
             capabilities:      m["capabilities"],
             remark:            m["remark"],
-            type:              m["type"]
+            type:              m["type"],
+            # Sub-model list for this row: the models of the provider its
+            # endpoint belongs to (same rule the session status bar uses), so
+            # the picker can offer the switcher on every row and not only on
+            # the session's current one.
+            sub_models:        provider_id ? Clacky::Providers.models(provider_id) : []
           }
         end
         # Sidecar capability configs (media/ocr) and auto-injected entries are
