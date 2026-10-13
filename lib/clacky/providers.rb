@@ -667,107 +667,6 @@ module Clacky
         },
         "default_ocr_model" => "kimi-k2.7-code",
         "website_url" => "https://ollama.com/settings/keys"
-      }.freeze,
-
-      "orcarouter" => {
-        "name" => "OrcaRouter",
-        "base_url" => "https://api.orcarouter.ai/v1",
-        "api" => "openai-completions",
-        "default_model" => "openai/gpt-5.5",
-        # Curated default lineup. OrcaRouter exposes 190+ models from OpenAI,
-        # Anthropic, Google, DeepSeek, Qwen, MiniMax, Zhipu and others behind a
-        # single OpenAI-compatible endpoint. Shipping a small list of the
-        # mainstream Claude + GPT entries gives users a working dropdown out
-        # of the box; users can still type any other OrcaRouter model id manually.
-        "models" => [
-          "anthropic/claude-sonnet-5",
-          "anthropic/claude-opus-4.8",
-          "anthropic/claude-haiku-4.5",
-          "openai/gpt-5.5",
-          "openai/gpt-5.4",
-          "openai/gpt-5.4-mini",
-          "google/gemini-3.5-flash",
-          "deepseek/deepseek-v4-flash",
-          "z-ai/glm-5.2"
-        ],
-        # Per-primary lite pairing — Claude family pairs with Haiku, GPT
-        # family pairs with the mini variant. Mirrors the openrouter preset
-        # so subagents on OrcaRouter get a sensible cheap/fast sidekick.
-        "lite_models" => {
-          "anthropic/claude-sonnet-5" => "anthropic/claude-haiku-4.5",
-          "anthropic/claude-opus-4.8" => "anthropic/claude-haiku-4.5",
-          "openai/gpt-5.5"            => "openai/gpt-5.4-mini",
-          "openai/gpt-5.4"            => "openai/gpt-5.4-mini"
-        },
-        # Per-model API type overrides. OrcaRouter proxies Claude through a
-        # native Anthropic /v1/messages endpoint (https://api.orcarouter.ai/v1/messages)
-        # in addition to its OpenAI-compatible /chat/completions endpoint.
-        # Routing "anthropic/*" via the native endpoint preserves cache_control
-        # fidelity, matching what Claude Code CLI does internally (same rationale
-        # as the openrouter preset). Non-Claude models keep the OpenAI shim.
-        "model_api_overrides" => {
-          /\Aanthropic\// => "anthropic-messages"
-        }.freeze,
-        # Most models on OrcaRouter are vision-capable; DeepSeek and GLM-5.2
-        # are text-only.
-        "capabilities" => { "vision" => true }.freeze,
-        "model_capabilities" => {
-          "deepseek/deepseek-v4-flash" => { "vision" => false }.freeze,
-          "z-ai/glm-5.2"               => { "vision" => false }.freeze
-        }.freeze,
-        "default_ocr_model" => "google/gemini-3.5-flash",
-        "website_url" => "https://www.orcarouter.ai"
-      }.freeze,
-
-      "requesty" => {
-        "name" => "Requesty",
-        "base_url" => "https://router.requesty.ai/v1",
-        "api" => "openai-completions",
-        "default_model" => "claude-sonnet-4-6",
-        # Curated default lineup of Requesty managed policies (GET /v1/models/managed).
-        # A managed policy is a short model id that Requesty routes across several
-        # upstream providers. Users can still type any other id manually, including
-        # the full "vendor/model" catalogue ids (e.g. "openai/gpt-4o-mini").
-        "models" => [
-          "claude-sonnet-4-6",
-          "claude-opus-4-8",
-          "claude-opus-4-7",
-          "claude-opus-4-6",
-          "claude-haiku-4-5",
-          "gpt-5.6-sol",
-          "gpt-5.6-terra",
-          "gpt-5.6-luna",
-          "gpt-5.5",
-          "gpt-5.4",
-          "gpt-5.4-mini",
-          "gemini-3.8-flash"
-        ],
-        # Per-primary lite pairing, same shape as the openrouter preset.
-        "lite_models" => {
-          "claude-sonnet-4-6" => "claude-haiku-4-5",
-          "claude-opus-4-8"   => "claude-haiku-4-5",
-          "claude-opus-4-7"   => "claude-haiku-4-5",
-          "claude-opus-4-6"   => "claude-haiku-4-5",
-          "gpt-5.6-sol"       => "gpt-5.6-luna",
-          "gpt-5.6-terra"     => "gpt-5.6-luna",
-          "gpt-5.5"           => "gpt-5.4-mini",
-          "gpt-5.4"           => "gpt-5.4-mini"
-        },
-        # Requesty also serves the native Anthropic /v1/messages endpoint, so
-        # Claude models route there to preserve cache_control fidelity (same
-        # rationale as the openrouter preset). Other models keep the OpenAI shim.
-        "model_api_overrides" => {
-          /\Aanthropic\// => "anthropic-messages",
-          /\Aclaude[-.]/  => "anthropic-messages"
-        }.freeze,
-        # Same API key works on every regional endpoint; the EU one keeps
-        # traffic inside the EU (Frankfurt).
-        "endpoint_variants" => [
-          { "label" => "Global", "base_url" => "https://router.requesty.ai/v1" }.freeze,
-          { "label" => "EU",     "base_url" => "https://router.eu.requesty.ai/v1", "region" => "eu" }.freeze
-        ].freeze,
-        "default_ocr_model" => "gemini-3.8-flash",
-        "website_url" => "https://app.requesty.ai/api-keys"
       }.freeze
 
     }.freeze
@@ -787,8 +686,6 @@ module Clacky
     MIMO_ID           = "mimo"
     VOLCENGINE_ARK_ID = "volcengine-ark"
     OLLAMA_ID         = "ollama"
-    ORCAROUTER_ID     = "orcarouter"
-    REQUESTY_ID       = "requesty"
 
     MEDIA_KINDS = %w[image video audio stt video_understanding].freeze
 

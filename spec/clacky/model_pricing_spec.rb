@@ -758,7 +758,7 @@ RSpec.describe Clacky::ModelPricing do
       end
     end
 
-    context "with vendor-prefixed ids (OpenRouter / OrcaRouter style)" do
+    context "with vendor-prefixed ids (OpenRouter style)" do
       it "drops the vendor segment before matching" do
         expect(described_class.normalize_model_name("google/gemini-3.5-flash")).to eq("gemini-3-flash")
         expect(described_class.normalize_model_name("z-ai/glm-5.2")).to eq("glm-5.2")
@@ -786,11 +786,9 @@ RSpec.describe Clacky::ModelPricing do
         expect(result[:source]).to eq(:price)
       end
 
-      it "leaves the auto-routing ids unpriced" do
-        ["auto", "orcarouter/auto"].each do |id|
-          result = described_class.calculate_cost(model: id, usage: { prompt_tokens: 1_000 })
-          expect(result[:source]).to be_nil, "expected no price for #{id}"
-        end
+      it "leaves the auto-routing id unpriced" do
+        result = described_class.calculate_cost(model: "auto", usage: { prompt_tokens: 1_000 })
+        expect(result[:source]).to be_nil, "expected no price for auto"
       end
     end
 

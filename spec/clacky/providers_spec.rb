@@ -239,99 +239,6 @@ RSpec.describe Clacky::Providers do
       end
     end
 
-    context "for OrcaRouter provider" do
-      it "resolves default model to openai/gpt-5.5" do
-        expect(described_class.default_model("orcarouter")).to eq("openai/gpt-5.5")
-      end
-
-      it "has correct base_url and api type" do
-        expect(described_class.base_url("orcarouter")).to eq("https://api.orcarouter.ai/v1")
-        expect(described_class.api_type("orcarouter")).to eq("openai-completions")
-      end
-
-      it "includes expected models" do
-        expect(described_class.models("orcarouter")).to include(
-          "openai/gpt-5.5", "openai/gpt-5.4-mini",
-          "anthropic/claude-sonnet-5", "anthropic/claude-haiku-4.5",
-          "google/gemini-3.5-flash", "deepseek/deepseek-v4-flash",
-          "z-ai/glm-5.2"
-        )
-        expect(described_class.models("orcarouter")).not_to include("orcarouter/auto")
-      end
-
-      it "returns correct lite model mappings" do
-        expect(described_class.lite_model("orcarouter", "anthropic/claude-sonnet-5")).to eq("anthropic/claude-haiku-4.5")
-        expect(described_class.lite_model("orcarouter", "anthropic/claude-opus-4.8")).to eq("anthropic/claude-haiku-4.5")
-        expect(described_class.lite_model("orcarouter", "openai/gpt-5.5")).to eq("openai/gpt-5.4-mini")
-        expect(described_class.lite_model("orcarouter", "openai/gpt-5.4")).to eq("openai/gpt-5.4-mini")
-      end
-
-      it "enforces vision capabilities correctly" do
-        # Vision-capable models
-        expect(described_class.supports?("orcarouter", :vision, model_name: "openai/gpt-5.5")).to be true
-        expect(described_class.supports?("orcarouter", :vision, model_name: "anthropic/claude-sonnet-5")).to be true
-        expect(described_class.supports?("orcarouter", :vision, model_name: "google/gemini-3.5-flash")).to be true
-        # Text-only models
-        expect(described_class.supports?("orcarouter", :vision, model_name: "deepseek/deepseek-v4-flash")).to be false
-        expect(described_class.supports?("orcarouter", :vision, model_name: "z-ai/glm-5.2")).to be false
-      end
-
-      it "resolves provider by base_url" do
-        expect(described_class.find_by_base_url("https://api.orcarouter.ai/v1")).to eq("orcarouter")
-        expect(described_class.find_by_base_url("https://api.orcarouter.ai/v1/chat/completions")).to eq("orcarouter")
-      end
-
-      it "has a website_url for API keys" do
-        preset = described_class::PRESETS["orcarouter"]
-        expect(preset["website_url"]).to eq("https://www.orcarouter.ai")
-      end
-
-      it "has a default_ocr_model" do
-        expect(described_class.default_ocr_model("orcarouter")).to eq("google/gemini-3.5-flash")
-      end
-    end
-
-    context "for Requesty provider" do
-      it "resolves default model to claude-sonnet-4-6" do
-        expect(described_class.default_model("requesty")).to eq("claude-sonnet-4-6")
-      end
-
-      it "has correct base_url and api type" do
-        expect(described_class.base_url("requesty")).to eq("https://router.requesty.ai/v1")
-        expect(described_class.api_type("requesty")).to eq("openai-completions")
-      end
-
-      it "includes expected models" do
-        expect(described_class.models("requesty")).to include(
-          "claude-sonnet-4-6", "claude-haiku-4-5",
-          "gpt-5.5", "gpt-5.4-mini", "gemini-3.8-flash"
-        )
-      end
-
-      it "returns correct lite model mappings" do
-        expect(described_class.lite_model("requesty", "claude-sonnet-4-6")).to eq("claude-haiku-4-5")
-        expect(described_class.lite_model("requesty", "claude-opus-4-8")).to eq("claude-haiku-4-5")
-        expect(described_class.lite_model("requesty", "gpt-5.6-sol")).to eq("gpt-5.6-luna")
-        expect(described_class.lite_model("requesty", "gpt-5.5")).to eq("gpt-5.4-mini")
-        expect(described_class.lite_model("requesty", "claude-haiku-4-5")).to be_nil
-      end
-
-      it "resolves provider by base_url, including the EU endpoint" do
-        expect(described_class.find_by_base_url("https://router.requesty.ai/v1")).to eq("requesty")
-        expect(described_class.find_by_base_url("https://router.requesty.ai/v1/chat/completions")).to eq("requesty")
-        expect(described_class.find_by_base_url("https://router.eu.requesty.ai/v1")).to eq("requesty")
-      end
-
-      it "has a website_url for API keys" do
-        preset = described_class::PRESETS["requesty"]
-        expect(preset["website_url"]).to eq("https://app.requesty.ai/api-keys")
-      end
-
-      it "has a default_ocr_model" do
-        expect(described_class.default_ocr_model("requesty")).to eq("gemini-3.8-flash")
-      end
-    end
-
     context "conservative default (unknown or undeclared)" do
       it "returns true for an unknown provider_id" do
         # Custom base_urls map to nil provider_id; assume capability supported
@@ -814,43 +721,6 @@ RSpec.describe Clacky::Providers do
           .to eq("anthropic-messages")
       end
     end
-
-    it "routes OrcaRouter anthropic/* models to anthropic-messages" do
-      # OrcaRouter also exposes a native Anthropic /v1/messages endpoint, so
-      # Claude models route there to preserve cache_control fidelity (same
-      # rationale as OpenRouter above).
-      expect(described_class.api_type_for_model("orcarouter", "anthropic/claude-sonnet-5"))
-        .to eq("anthropic-messages")
-      expect(described_class.api_type_for_model("orcarouter", "anthropic/claude-opus-4.8"))
-        .to eq("anthropic-messages")
-    end
-
-    it "keeps non-Claude OrcaRouter models on the OpenAI shim" do
-      expect(described_class.api_type_for_model("orcarouter", "google/gemini-3.5-flash"))
-        .to eq("openai-completions")
-      expect(described_class.api_type_for_model("orcarouter", "openai/gpt-5.5"))
-        .to eq("openai-completions")
-      expect(described_class.api_type_for_model("orcarouter", "deepseek/deepseek-v4-flash"))
-        .to eq("openai-completions")
-    end
-
-    it "routes Requesty Claude models to anthropic-messages" do
-      # Requesty also serves the native Anthropic /v1/messages endpoint, for
-      # both managed policy ids and vendor-prefixed catalogue ids.
-      expect(described_class.api_type_for_model("requesty", "claude-sonnet-4-6"))
-        .to eq("anthropic-messages")
-      expect(described_class.api_type_for_model("requesty", "anthropic/claude-sonnet-4-6"))
-        .to eq("anthropic-messages")
-    end
-
-    it "keeps non-Claude Requesty models on the OpenAI shim" do
-      expect(described_class.api_type_for_model("requesty", "gpt-5.5"))
-        .to eq("openai-completions")
-      expect(described_class.api_type_for_model("requesty", "openai/gpt-4o-mini"))
-        .to eq("openai-completions")
-      expect(described_class.api_type_for_model("requesty", "gemini-3.8-flash"))
-        .to eq("openai-completions")
-    end
   end
 
   describe ".default_ocr_model" do
@@ -879,26 +749,6 @@ RSpec.describe Clacky::Providers do
 
     it "is false for unknown providers" do
       expect(described_class.anthropic_format_for_model?("ghost-provider", "any-model")).to be false
-    end
-
-    it "is true for OrcaRouter Claude models" do
-      expect(described_class.anthropic_format_for_model?("orcarouter", "anthropic/claude-sonnet-5"))
-        .to be true
-    end
-
-    it "is false for OrcaRouter non-Claude models" do
-      expect(described_class.anthropic_format_for_model?("orcarouter", "openai/gpt-5.5"))
-        .to be false
-    end
-
-    it "is true for Requesty Claude models" do
-      expect(described_class.anthropic_format_for_model?("requesty", "claude-haiku-4-5"))
-        .to be true
-    end
-
-    it "is false for Requesty non-Claude models" do
-      expect(described_class.anthropic_format_for_model?("requesty", "gpt-5.5"))
-        .to be false
     end
   end
 
