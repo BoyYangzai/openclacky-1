@@ -613,6 +613,13 @@ RSpec.describe Clacky::Server::HttpServer do
   # ── DELETE /api/sessions/:id ──────────────────────────────────────────────
 
   describe "DELETE /api/sessions/:id" do
+    # Soft delete moves the file into the global trash root, which is resolved
+    # from Dir.home and ignores `sessions_dir:` — point it at a tmpdir so a run
+    # cannot drop a "to-delete" session into the developer's real ~/.clacky/trash.
+    let!(:trash_root) { Dir.mktmpdir("clacky_http_spec_trash") }
+    before { stub_const("Clacky::TrashDirectory::GLOBAL_TRASH_ROOT", trash_root) }
+    after  { FileUtils.rm_rf(trash_root) }
+
     it "deletes an existing session" do
       with_server(agent_config: agent_config) do |server|
         # Create a session first
@@ -639,6 +646,47 @@ RSpec.describe Clacky::Server::HttpServer do
         dispatch(server, req, res)
 
         expect(res.status).to eq(404)
+      end
+    end
+  end
+
+  # ── DELETE /api/archive/sessions ──────────────────────────────────────────
+
+  describe "DELETE /api/archive/sessions" do
+    let!(:trash_root) { Dir.mktmpdir("clacky_http_archive_trash") }
+    before { stub_const("Clacky::TrashDirectory::GLOBAL_TRASH_ROOT", trash_root) }
+    after  { FileUtils.rm_rf(trash_root) }
+
+    it "soft-deletes all archived sessions into the trash" do
+      with_server(agent_config: agent_config) do |server|
+        # Create two sessions, archive one
+        req1 = fake_req(method: "POST", path: "/api/sessions", body: { name: "archived-one" })
+        res1 = fake_res
+        dispatch(server, req1, res1)
+        id1 = parsed_body(res1)["session"]["id"]
+
+        req2 = fake_req(method: "POST", path: "/api/sessions", body: { name: "keep-active" })
+        res2 = fake_res
+        dispatch(server, req2, res2)
+        id2 = parsed_body(res2)["session"]["id"]
+
+        archive_req = fake_req(method: "PATCH", path: "/api/sessions/#{id1}", body: { archived: true })
+        dispatch(server, archive_req, fake_res)
+
+        # Empty the archive
+        del_req = fake_req(method: "DELETE", path: "/api/archive/sessions")
+        del_res = fake_res
+        dispatch(server, del_req, del_res)
+
+        expect(del_res.status).to eq(200)
+        expect(parsed_body(del_res)["ok"]).to be true
+        expect(parsed_body(del_res)["deleted_count"]).to eq(1)
+
+        # Active session still exists
+        check_req = fake_req(method: "GET", path: "/api/sessions/#{id2}")
+        check_res = fake_res
+        dispatch(server, check_req, check_res)
+        expect(check_res.status).to eq(200)
       end
     end
   end

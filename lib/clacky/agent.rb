@@ -52,6 +52,9 @@ module Clacky
     attr_accessor :pinned
     attr_accessor :channel_info
     attr_accessor :project_id
+    # ISO8601 stamp set when the user archives the session; nil = active.
+    # Archived sessions stay on disk but drop out of every normal list.
+    attr_accessor :archived_at
 
     REASONING_EFFORTS = %w[low medium high xhigh max].freeze
     MAX_VIDEO_UNDERSTANDING_BYTES = Utils::FileProcessor::MAX_FILE_BYTES
@@ -93,6 +96,7 @@ module Clacky
       @session_id = session_id
       @name = ""
       @pinned = false
+      @archived_at = nil
       @history = MessageHistory.new
       @todos = []  # Store todos in memory
       @iterations = 0

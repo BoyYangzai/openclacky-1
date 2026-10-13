@@ -308,15 +308,17 @@
                  Kept as a hidden placeholder so any legacy CSS selector that
                  targets this id still resolves harmlessly. -->
           </div>
-          <div id="trash-sidebar-item" class="task-item task-item-summary">
+          <!-- Data management: one page holding the archive / recycle bin /
+               backup tabs. One rail entry keeps Billing on screen. -->
+          <div id="data-management-sidebar-item" class="task-item task-item-summary">
             <div class="task-row">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="task-icon">
-                <rect x="2" y="3" width="20" height="5" rx="1"/>
-                <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/>
-                <path d="M10 12h4"/>
+                <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                <path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
               </svg>
               <div class="task-info">
-                <span class="task-name" id="trash-sidebar-label" data-i18n="sidebar.trash">File Recall</span>
+                <span class="task-name" id="data-management-label" data-i18n="sidebar.dataManagement">Data</span>
               </div>
             </div>
           </div>
@@ -844,30 +846,122 @@
       <div id="extensions-detail" class="extension-detail" style="display:none"></div>
     </div>
 
-    <!-- ── TRASH PANEL — Recently deleted files across all projects ─── -->
-    <div id="trash-panel" style="display:none">
-      <div id="trash-body">
+    <!-- ── DATA MANAGEMENT PANEL — one page, three tabs ──────────────────
+         Archived sessions / recycle bin / backup used to be three top-level
+         panels. They now share one page: the tab bar owns the naming, each
+         tab keeps its own panel element so every module still owns exactly
+         one body to render into. ── -->
+    <div id="data-management-panel" style="display:none">
+      <!-- Title and description mirror the Assistant Memory page: the rail entry
+           label doubles as the page title, the tabs sit right below. -->
+      <div id="data-management-header">
         <div class="channels-page-header">
           <div class="channels-page-header-main">
-            <h2 class="channels-page-title page-title" data-i18n="trash.title">File Recall</h2>
-            <p class="channels-page-subtitle" data-i18n="trash.subtitle">Files the agent moved to trash across all projects. Recall them back to where they were, or clear the ones you don't need.</p>
+            <h2 class="channels-page-title page-title" data-i18n="dataManagement.title">Data</h2>
+            <p class="channels-page-subtitle" data-i18n="dataManagement.subtitle">Archiving only hides a session from the sidebar, recycled files can be restored to where they were, and a backup can move your whole ~/.clacky to another machine.</p>
+          </div>
+        </div>
+      </div>
+      <div id="data-management-tabs" class="page-tabs" role="tablist">
+        <button type="button" class="page-tab active" role="tab" aria-selected="true"
+                data-dm-tab="archive" id="tab-dm-archive" aria-controls="archive-panel" data-i18n="archive.title">Archived sessions</button>
+        <button type="button" class="page-tab" role="tab" aria-selected="false"
+                data-dm-tab="trash" id="tab-dm-trash" aria-controls="trash-panel" data-i18n="trash.title">Recycle Bin</button>
+        <button type="button" class="page-tab" role="tab" aria-selected="false"
+                data-dm-tab="backup" id="tab-dm-backup" aria-controls="backup-panel" data-i18n="backup.title">Data backup</button>
+      </div>
+
+    <!-- ── ARCHIVE PANEL — chats the user archived: off the rail, still on disk ── -->
+    <div id="archive-panel" class="dm-view" style="display:none">
+      <div id="archive-body">
+        <div class="trash-toolbar">
+          <div class="archive-search-wrap">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="archive-search-icon">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="search" id="archive-search" class="archive-search-input" data-i18n-placeholder="archive.searchPlaceholder" placeholder="Search archived sessions" autocomplete="off" spellcheck="false">
+          </div>
+
+          <div class="trash-filter-project-wrap">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-filter-project-icon">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <div class="custom-select-wrapper" id="archive-filter-project">
+              <div class="custom-select-trigger custom-select-trigger--bare" tabindex="0">
+                <span class="custom-select-value placeholder" data-i18n="archive.filterAllProjects">All projects</span>
+                <svg class="custom-select-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </div>
+              <div class="custom-select-dropdown"></div>
+            </div>
+          </div>
+
+          <div class="trash-filter-project-wrap">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-filter-project-icon">
+              <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/>
+              <line x1="7" y1="7" x2="7.01" y2="7"/>
+            </svg>
+            <div class="custom-select-wrapper" id="archive-filter-type">
+              <div class="custom-select-trigger custom-select-trigger--bare" tabindex="0">
+                <span class="custom-select-value placeholder" data-i18n="archive.filterAllTypes">All types</span>
+                <svg class="custom-select-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+              </div>
+              <div class="custom-select-dropdown"></div>
+            </div>
+          </div>
+
+          <span class="trash-summary" id="archive-summary"></span>
+
+          <button id="btn-archive-delete-all" class="btn-trash-action btn-trash-danger">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/><path d="M14 11v6"/>
+              <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+            <span data-i18n="archive.deleteAll">Delete all</span>
+          </button>
+        </div>
+
+        <div id="archive-list"></div>
+
+        <button id="btn-archive-load-more" style="display:none" data-i18n="archive.loadMore">Load more</button>
+      </div>
+    </div>
+
+    <!-- ── TRASH PANEL — Recently deleted files across all projects ─── -->
+    <div id="trash-panel" class="dm-view" style="display:none">
+      <div id="trash-body">
+        <div id="trash-tabs">
+          <div class="segmented-control">
+            <button class="trash-tab segmented-control__btn active" data-tab="session-trash" id="tab-session-trash" data-i18n="trash.tabSession">Sessions</button>
+            <button class="trash-tab segmented-control__btn" data-tab="file-trash" id="tab-file-trash" data-i18n="trash.tabFile">Agent Files</button>
           </div>
         </div>
 
-        <div id="trash-tabs" class="page-tabs">
-          <div class="trash-tabs-left">
-            <button class="trash-tab page-tab active" data-tab="file-trash" id="tab-file-trash" data-i18n="trash.tabFile">文件回收</button>
-            <button class="trash-tab page-tab" data-tab="session-trash" id="tab-session-trash" data-i18n="trash.tabSession">会话回收</button>
-          </div>
-        </div>
-
-        <p class="trash-session-hint" id="trash-session-hint" style="display:none" data-i18n="trash.sessionAutoCleanHint">The system keeps the most recent 200 sessions; older ones are moved here.</p>
+        <p class="trash-session-hint" id="trash-session-hint" data-i18n="trash.sessionAutoCleanHint">The system keeps the most recent 200 sessions; older ones are moved here.</p>
 
         <div class="trash-toolbar">
-          <div class="trash-filter-bar" id="trash-filter-bar" style="display:none">
-            <button class="trash-filter-chip active" data-filter="all" data-i18n="trash.filterAll">All</button>
-            <button class="trash-filter-chip" data-filter="manual" data-i18n="trash.filterManual">Regular</button>
-            <button class="trash-filter-chip" data-filter="cron" data-i18n="trash.filterCron">Scheduled</button>
+          <div class="trash-filter-bar" id="trash-filter-bar">
+            <div class="trash-filter-project-wrap">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-filter-project-icon">
+                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.83z"/>
+                <line x1="7" y1="7" x2="7.01" y2="7"/>
+              </svg>
+              <div class="custom-select-wrapper" id="trash-filter-source">
+                <div class="custom-select-trigger custom-select-trigger--bare" tabindex="0">
+                  <span class="custom-select-value placeholder" data-i18n="trash.filterAllTypes">All types</span>
+                  <svg class="custom-select-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+                <div class="custom-select-dropdown"></div>
+              </div>
+            </div>
             <div class="trash-filter-project-wrap" id="trash-filter-project-wrap">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="trash-filter-project-icon">
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
@@ -898,7 +992,7 @@
               </svg>
               <span data-i18n="trash.emptyOld">Empty older than 7 days</span>
             </button>
-            <button id="btn-trash-empty-orphans" class="btn-trash-action btn-trash-danger" data-i18n-title="trash.emptyOrphans.tooltip" title="Permanently delete entries whose original project directory no longer exists (e.g. test temp dirs)">
+            <button id="btn-trash-empty-orphans" class="btn-trash-action btn-trash-danger" style="display:none" data-i18n-title="trash.emptyOrphans.tooltip" title="Permanently delete entries whose original project directory no longer exists (e.g. test temp dirs)">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                 <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -917,15 +1011,71 @@
           </div>
         </div>
 
-        <div id="trash-tab-file" class="trash-tab-content">
+        <div id="trash-tab-file" class="trash-tab-content" style="display:none">
           <div id="trash-list"></div>
         </div>
 
-        <div id="trash-tab-session" class="trash-tab-content" style="display:none">
+        <div id="trash-tab-session" class="trash-tab-content">
           <div id="trash-session-list"></div>
         </div>
       </div>
     </div>
+
+    <!-- ── BACKUP PANEL — auto/manual backup of ~/.clacky (moved out of Settings) ── -->
+    <div id="backup-panel" class="dm-view" style="display:none">
+      <div id="backup-body">
+        <div id="backup-content">
+
+          <!-- 自动备份 -->
+          <section class="settings-section" id="backup-section">
+            <div class="settings-section-title">
+              <span data-i18n="settings.backup.autoTitle">Auto Backup</span>
+            </div>
+            <p class="settings-section-desc" data-i18n="settings.backup.desc">Back up your ~/.clacky directory (config, skills, memories, tasks, sessions). Regenerable caches and logs are excluded.</p>
+
+            <div class="backup-auto-card">
+              <div class="backup-auto-row">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="backup-auto-toggle">
+                  <span class="toggle-slider"></span>
+                </label>
+                <span class="backup-auto-label" data-i18n="settings.backup.autoLabel">Automatic backup</span>
+                <span class="backup-auto-hint" data-i18n="settings.backup.autoHint">Daily at 03:00, keeps the latest 7</span>
+              </div>
+              <div class="backup-dest-row">
+                <span class="backup-dest-label" data-i18n="settings.backup.destLabel">Backup folder</span>
+                <span class="backup-dest-path" id="backup-dest-path">—</span>
+                <button id="btn-backup-open-folder" class="btn-backup-action" data-i18n="settings.backup.openFolder">Open</button>
+              </div>
+              <div id="backup-status" class="model-test-result"></div>
+            </div>
+            <label class="backup-option">
+              <input type="checkbox" id="backup-include-sessions">
+              <span data-i18n="settings.backup.includeSessions">Include session history (larger archive)</span>
+            </label>
+          </section>
+
+          <!-- 手动备份 -->
+          <section class="settings-section">
+            <div class="settings-section-title">
+              <span data-i18n="settings.backup.manualTitle">Manual Backup</span>
+            </div>
+
+            <div class="backup-actions">
+              <button id="btn-backup-now" class="btn-backup-action" data-i18n="settings.backup.runNow">Download backup</button>
+              <label class="btn-backup-action">
+                <span data-i18n="settings.backup.restoreBtn">Restore backup</span>
+                <input type="file" id="input-backup-restore" accept=".tar.gz,.gz" style="display:none">
+              </label>
+              <span id="backup-manual-status" class="model-test-result"></span>
+            </div>
+          </section>
+
+        </div>
+      </div>
+    </div>
+    </div>
+    <!-- /data-management-panel -->
 
     <!-- ── PROFILE PANEL — "Assistant Memory": a 3-tab window into the agent's inner state.
          All mutations happen through sessions (never in-browser editors):
@@ -1032,7 +1182,6 @@
         <button class="settings-tab page-tab active" data-tab="models" data-i18n="settings.tabs.models">Models</button>
         <button class="settings-tab page-tab" data-tab="ui" data-i18n="settings.tabs.ui">UI</button>
         <button class="settings-tab page-tab" data-tab="general" data-i18n="settings.tabs.general">General</button>
-        <button class="settings-tab page-tab" data-tab="data" data-i18n="settings.tabs.data">Data</button>
         <!-- Extension tab slot: extensions add custom settings tabs here (button needs data-tab="<id>"). -->
         <span id="ext-slot-settings-tabs" data-slot="settings.tabs"></span>
         <button class="settings-tab page-tab" data-tab="about" data-i18n="settings.tabs.about">About</button>
@@ -1278,10 +1427,6 @@
             </div>
           </section>
 
-          <!-- Backup section -->
-          <section class="settings-section" id="backup-section" style="display:none">
-          </section>
-
           <!-- Brand & License section -->
           <section class="settings-section" id="brand-license-section">
             <div class="settings-section-title">
@@ -1389,56 +1534,6 @@
 
           </section>
         </div><!-- end Tab: General -->
-
-        <!-- ══ Tab: Data ══ -->
-        <div class="settings-tab-content" data-tab-content="data" style="display:none">
-
-          <!-- 自动备份 -->
-          <section class="settings-section">
-            <div class="settings-section-title">
-              <span data-i18n="settings.backup.autoTitle">Auto Backup</span>
-            </div>
-            <p class="settings-section-desc" data-i18n="settings.backup.desc">Back up your ~/.clacky directory (config, skills, memories, tasks, sessions). Regenerable caches and logs are excluded.</p>
-
-            <div class="backup-auto-card">
-              <div class="backup-auto-row">
-                <label class="toggle-switch">
-                  <input type="checkbox" id="backup-auto-toggle">
-                  <span class="toggle-slider"></span>
-                </label>
-                <span class="backup-auto-label" data-i18n="settings.backup.autoLabel">Automatic backup</span>
-                <span class="backup-auto-hint" data-i18n="settings.backup.autoHint">Daily at 03:00, keeps the latest 7</span>
-              </div>
-              <label class="backup-option backup-option-nested">
-                <input type="checkbox" id="backup-include-sessions">
-                <span data-i18n="settings.backup.includeSessions">Include session history (larger archive)</span>
-              </label>
-              <div class="backup-dest-row">
-                <span class="backup-dest-label" data-i18n="settings.backup.destLabel">Backup folder</span>
-                <span class="backup-dest-path" id="backup-dest-path">—</span>
-                <button id="btn-backup-open-folder" class="btn-settings-link" data-i18n="settings.backup.openFolder">Open</button>
-              </div>
-              <div id="backup-status" class="model-test-result"></div>
-            </div>
-          </section>
-
-          <!-- 手动备份 -->
-          <section class="settings-section">
-            <div class="settings-section-title">
-              <span data-i18n="settings.backup.manualTitle">Manual Backup</span>
-            </div>
-
-            <div class="backup-actions">
-              <button id="btn-backup-now" class="btn-settings-action" data-i18n="settings.backup.runNow">Download backup</button>
-              <label class="btn-settings-action btn-settings-action--file">
-                <span data-i18n="settings.backup.restoreBtn">Restore backup</span>
-                <input type="file" id="input-backup-restore" accept=".tar.gz,.gz" style="display:none">
-              </label>
-              <span id="backup-manual-status" class="model-test-result"></span>
-            </div>
-          </section>
-
-        </div><!-- end Tab: Data -->
 
         <!-- ══ Tab: About ══ -->
         <div class="settings-tab-content" data-tab-content="about" style="display:none">
@@ -1886,6 +1981,8 @@
 <script src="/features/brand/view.js"></script>
 <script src="/features/trash/store.js"></script>
 <script src="/features/trash/view.js"></script>
+<script src="/features/archive/store.js"></script>
+<script src="/features/archive/view.js"></script>
 <script src="/features/profile/store.js"></script>
 <script src="/features/profile/view.js"></script>
 <script src="/features/version/store.js"></script>

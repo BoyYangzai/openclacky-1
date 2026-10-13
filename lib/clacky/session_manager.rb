@@ -363,7 +363,10 @@ module Clacky
       metas = files.filter_map { |f| m = load_session_metadata(f); m && m.merge(_path: f) }
                    .sort_by { |s| s[:updated_at] || s[:created_at] || "" }.reverse
 
-      non_pinned = metas.reject { |s| s[:pinned] }
+      # Archived sessions are user-curated, so they are exempt from the rolling
+      # cap exactly like pinned ones — an archive that silently empties itself
+      # would be worse than no archive at all.
+      non_pinned = metas.reject { |s| s[:pinned] || s[:archived_at].to_s != "" }
 
       groups = non_pinned.group_by { |s| group_key_for(s) }
 
@@ -547,10 +550,11 @@ module Clacky
     # Read only the small scalar header of a session file without parsing the
     # (potentially multi-MB) messages / time_machine payload. Session JSON is
     # written with a stable field order, so the fields we care about here
-    # (session_id, pinned, created_at, updated_at, source) always sit in the
-    # first few hundred bytes, before any large array/object. `project_id`
-    # lives much later and is intentionally NOT read — callers that need it
-    # fall back to load_session_file for the rare candidate that requires it.
+    # (session_id, pinned, archived_at, created_at, updated_at, source) always
+    # sit in the first few hundred bytes, before any large array/object.
+    # `project_id` lives much later and is intentionally NOT read — callers
+    # that need it fall back to load_session_file for the rare candidate that
+    # requires it.
     #
     # Returns a Hash with symbol keys, or nil if the header can't be read.
     METADATA_HEADER_BYTES = 16 * 1024
@@ -564,12 +568,24 @@ module Clacky
       {
         session_id: sid,
         pinned:     head[/"pinned"\s*:\s*(true|false)/, 1] == "true",
+        archived_at: head[/"archived_at"\s*:\s*"([^"]*)"/, 1],
         created_at: head[/"created_at"\s*:\s*"([^"]*)"/, 1],
         updated_at: head[/"updated_at"\s*:\s*"([^"]*)"/, 1],
         source:     head[/"source"\s*:\s*"([^"]*)"/, 1]
       }
     rescue Errno::ENOENT
       nil
+    end
+
+    # How many sessions sit in the archive. The WebUI offers "delete all" on
+    # that page, so it needs the size of the whole archive rather than the page
+    # it happens to have loaded — and a header-only read keeps the cost at one
+    # small read per file.
+    def archived_count
+      Dir.glob(File.join(@sessions_dir, "*.json")).count do |filepath|
+        meta = load_session_metadata(filepath)
+        meta && meta[:archived_at].to_s != ""
+      end
     end
 
     # Remove Time Machine snapshots that no longer belong to any known session.

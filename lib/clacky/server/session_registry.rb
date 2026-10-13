@@ -204,11 +204,16 @@ module Clacky
       #             an old session always see it at the top of the sidebar,
       #             even if many newer sessions exist.
       #
+      #   archived:  false (default) → archived sessions are excluded from the
+      #             result; true → ONLY archived sessions are returned. The two
+      #             sets are disjoint, so every other caller keeps seeing exactly
+      #             the sessions it saw before archiving existed.
+      #
       # Ordering of the returned array:
       #   [ ...all_pinned_matching (newest-first), ...non_pinned (newest-first, limited) ]
       #
       # source and profile are orthogonal — either can be nil independently.
-      def list(limit: nil, before: nil, q: nil, q_scope: "name", date: nil, type: nil, exclude_type: nil, include_pinned: true, project_id: nil, exclude_project: false)
+      def list(limit: nil, before: nil, q: nil, q_scope: "name", date: nil, type: nil, exclude_type: nil, include_pinned: true, project_id: nil, exclude_project: false, archived: false)
         return [] unless @session_manager
 
         live = @mutex.synchronize do
@@ -232,6 +237,8 @@ module Clacky
         end
 
         all = @session_manager.all_sessions  # already sorted newest-first
+
+        all = all.select { |s| archived ? s[:archived_at].to_s != "" : s[:archived_at].to_s == "" }
 
         # ── type filter (replaces old source/profile split) ──────────────────
         # type=coding  → agent_profile == "coding"
@@ -384,6 +391,7 @@ module Clacky
           latest_latency: ls&.dig(:latest_latency),
           reasoning_effort: ls&.dig(:reasoning_effort) || s.dig(:config, :reasoning_effort),
           pinned:        s[:pinned] || false,
+          archived_at:   s[:archived_at],
           channel_info:  s[:channel_info],
           project_id:    s[:project_id],
           todos:         ls&.dig(:todos) || s[:todos] || [],
@@ -414,10 +422,13 @@ module Clacky
       public
 
       # Count + latest updated_at for sessions of a given source, excluding
-      # those assigned to a project (they show in the project section instead).
+      # those assigned to a project (they show in the project section instead)
+      # and archived ones (they show in the archive view instead).
       def group_stats(source)
         return { count: 0, latest_updated_at: nil } unless @session_manager
-        group_all = @session_manager.all_sessions.select { |s| s_source(s) == source && s[:project_id].to_s.strip == "" }
+        group_all = @session_manager.all_sessions.select {
+          |s| s_source(s) == source && s[:project_id].to_s.strip == "" && s[:archived_at].to_s == ""
+        }
         latest = group_all.map { |s| s[:updated_at] || s[:created_at] }.compact.max
         { count: group_all.size, latest_updated_at: latest }
       end
@@ -425,6 +436,13 @@ module Clacky
       # Stats for every folded sidebar group, keyed by source.
       def group_stats_all
         SessionManager::GROUPED_SOURCES.to_h { |source| [source, group_stats(source)] }
+      end
+
+      # How many sessions the archive holds. The archive page keeps only one
+      # page of rows in the browser, so its "delete all" confirmation takes the
+      # size from here — a header-only scan, unlike `list`.
+      def archived_count
+        @session_manager ? @session_manager.archived_count : 0
       end
 
       # Delete a session from registry (and interrupt its thread).

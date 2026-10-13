@@ -733,6 +733,7 @@ module Clacky
         when ["GET",    "/api/trash/sessions"]     then api_trash_sessions(req, res)
         when ["POST",   "/api/trash/sessions/restore"] then api_trash_session_restore(req, res)
         when ["DELETE", "/api/trash/sessions"]     then api_trash_sessions_delete(req, res)
+        when ["DELETE", "/api/archive/sessions"]   then api_archive_sessions_empty(res)
         when ["GET",    "/api/profile"]   then api_profile_get(res)
         when ["PUT",    "/api/profile"]   then api_profile_put(req, res)
         when ["GET",    "/api/memories"]  then api_memories_list(res)
@@ -972,6 +973,7 @@ module Clacky
         date         = query["date"].to_s.strip.then    { |v| v.empty? ? nil : v }
         type         = query["type"].to_s.strip.then    { |v| v.empty? ? nil : v }
         exclude_type = query["exclude_type"].to_s.split(",").map(&:strip).reject(&:empty?).then { |v| v.empty? ? nil : v }
+        archived     = %w[1 true yes].include?(query["archived"].to_s.strip.downcase)
         # Backward-compat: ?source=<x> and ?profile=coding → type
         type ||= query["profile"].to_s.strip.then { |v| v.empty? ? nil : v }
         type ||= query["source"].to_s.strip.then  { |v| v.empty? ? nil : v }
@@ -981,16 +983,23 @@ module Clacky
         # in the project section, so they must not eat into this page's quota.
         # Search (no before) keeps the original semantics: without a type filter
         # it may still match project sessions.
-        exclude_project = before ? true : !!type
-        sessions = @registry.list(limit: limit + 1, before: before, q: q, q_scope: q_scope, date: date, type: type, exclude_type: exclude_type, exclude_project: exclude_project)
+        #
+        # The archive view is the exception: it groups archived sessions by
+        # project by hand, so project membership must survive both filters.
+        exclude_project = archived ? false : (before ? true : !!type)
+        sessions = @registry.list(limit: limit + 1, before: before, q: q, q_scope: q_scope, date: date, type: type, exclude_type: exclude_type, exclude_project: exclude_project, archived: archived)
 
         pinned_part, non_pinned_part = sessions.partition { |s| s[:pinned] }
         has_more = non_pinned_part.size > limit
         non_pinned_part = non_pinned_part.first(limit)
         sessions = pinned_part + non_pinned_part
 
-        json_response(res, 200, { sessions: sessions, has_more: has_more,
-                                  groups: @registry.group_stats_all })
+        payload = { sessions: sessions, has_more: has_more, groups: @registry.group_stats_all }
+        # The archive page offers "delete all", so it needs the size of the whole
+        # archive — the paged `sessions` array only ever shows one page of it.
+        payload[:archived_count] = @registry.archived_count if archived
+
+        json_response(res, 200, payload)
       end
 
       # GET /api/sessions/:id — fetch a single session by id (memory + disk merged).
@@ -7272,6 +7281,11 @@ module Clacky
         body = parse_json_body(req)
         new_name = body["name"]&.to_s&.strip
         pinned = body["pinned"]
+        archived = body["archived"]
+
+        if !archived.nil? && archived != true && archived != false
+          return json_response(res, 400, { error: "archived must be true or false" })
+        end
 
         return json_response(res, 404, { error: "Session not found" }) unless @registry.ensure(session_id)
 
@@ -7287,6 +7301,11 @@ module Clacky
         if !pinned.nil?
           agent.pinned = pinned
         end
+
+        # Update archived status if provided
+        if !archived.nil?
+          agent.archived_at = archived ? Time.now.iso8601 : nil
+        end
         
         # Save session data
         @session_manager.save(agent.to_session_data(updated_at: Time.now))
@@ -7295,11 +7314,13 @@ module Clacky
         update_data = { type: "session_updated", session_id: session_id }
         update_data[:name] = new_name if new_name && !new_name.empty?
         update_data[:pinned] = pinned unless pinned.nil?
+        update_data[:archived_at] = agent.archived_at unless archived.nil?
         broadcast(session_id, update_data)
         
         response_data = { ok: true }
         response_data[:name] = new_name if new_name && !new_name.empty?
         response_data[:pinned] = pinned unless pinned.nil?
+        response_data[:archived_at] = agent.archived_at unless archived.nil?
         json_response(res, 200, response_data)
       rescue => e
         json_response(res, 500, { error: e.message })
@@ -7548,6 +7569,23 @@ module Clacky
         json_response(res, 201, { session: @registry.snapshot(fork_id) })
       end
 
+      # DELETE /api/archive/sessions
+      # Empties the archive: every archived chat is soft-deleted and lands in
+      # the recycle bin, never destroyed for good. Archiving keeps a chat out of
+      # the sidebar, so clearing the archive means the user is done with all of
+      # them. The toolbar's search and filters deliberately do not narrow this —
+      # the button says "delete all", and the confirmation counts what this
+      # call is about to take out.
+      def api_archive_sessions_empty(res)
+        ids = @registry.list(archived: true).map { |s| s[:id] }
+
+        # `list` just read these ids off disk, so skip the per-id existence
+        # probe — `load` re-parses every session file for each call.
+        ids.each { |session_id| soft_delete_session!(session_id, on_disk: true) }
+
+        json_response(res, 200, { ok: true, deleted_count: ids.size })
+      end
+
       def api_delete_session(session_id, res)
         # A session exists if it's either in the runtime registry OR on disk.
         # Old sessions that were never restored into memory this server run
@@ -7555,28 +7593,36 @@ module Clacky
         # must still be able to delete them. Previously this endpoint only
         # consulted @registry and returned 404 for disk-only sessions,
         # causing the "can't delete old sessions" bug.
+        return json_response(res, 404, { error: "Session not found" }) unless soft_delete_session!(session_id)
+
+        json_response(res, 200, { ok: true })
+      end
+
+      # Move one session to the recycle bin and tell everyone who can see it.
+      # Returns false when the session is unknown — neither live nor on disk.
+      #
+      # `on_disk` skips the existence probe for callers that already scanned the
+      # disk themselves: `SessionManager#load` re-parses every session file until
+      # it finds a match, which is far too expensive to run per id in a bulk path.
+      private def soft_delete_session!(session_id, on_disk: nil)
         in_registry = @registry.exist?(session_id)
-        on_disk     = !@session_manager.load(session_id).nil?
+        on_disk     = !@session_manager.load(session_id).nil? if on_disk.nil?
+        return false unless in_registry || on_disk
 
-        unless in_registry || on_disk
-          return json_response(res, 404, { error: "Session not found" })
-        end
-
-        # Registry delete is best-effort — only meaningful when the session
-        # is actually live (cancels idle timer, interrupts the agent thread).
-        # For disk-only sessions this is a no-op and returns false, which is
-        # fine and no longer blocks the disk cleanup below.
+        # Registry delete is best-effort — only meaningful when the session is
+        # actually live (cancels idle timer, interrupts the agent thread). For
+        # disk-only sessions this is a no-op and returns false, which is fine and
+        # no longer blocks the disk cleanup below.
         @registry.delete(session_id) if in_registry
 
         # Soft-delete: move session to trash instead of permanently destroying it.
         @session_manager.soft_delete(session_id) if on_disk
 
-        # Notify any still-connected clients (mainly matters when the
-        # session was live, but harmless otherwise).
+        # Notify any still-connected clients (mainly matters when the session was
+        # live, but harmless otherwise) so other tabs drop the row too.
         broadcast(session_id, { type: "session_deleted", session_id: session_id })
         unsubscribe_all(session_id)
-
-        json_response(res, 200, { ok: true })
+        true
       end
 
       # Export a session bundle as a .zip download containing:

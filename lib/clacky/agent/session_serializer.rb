@@ -17,6 +17,7 @@ module Clacky
         @session_id = session_data[:session_id]
         @name = session_data[:name] || ""
         @pinned = session_data[:pinned] || false
+        @archived_at = session_data[:archived_at]
         @history = MessageHistory.new(session_data[:messages] || [])
         @input_queue = (session_data[:pending_inputs] || []).map do |entry|
           entry.reject { |key, _| key == :steer_target }.merge(delivery: "queue")
@@ -244,6 +245,9 @@ module Clacky
           session_id: @session_id,
           name: @name,
           pinned: @pinned,
+          # Kept next to the other scalars so SessionManager's header-only
+          # reader can pick it up without parsing the message payload.
+          archived_at: @archived_at,
           created_at: @created_at,
           updated_at: stamp,
           working_dir: @working_dir,

@@ -19,17 +19,18 @@ RSpec.describe Clacky::SessionManager, "#cleanup_by_count" do
 
   # Write a session JSON directly so we control created_at / pinned without
   # triggering save's own cleanup pass.
-  def write_session(id:, created_at:, pinned: false, source: nil, project_id: nil)
+  def write_session(id:, created_at:, pinned: false, source: nil, project_id: nil, archived_at: nil)
     filename = manager.send(:generate_filename, id, created_at)
     data = {
-      session_id: id,
-      created_at: created_at,
-      updated_at: created_at,
-      pinned:     pinned,
-      source:     source,
-      project_id: project_id,
-      messages:   []
+      session_id:  id,
+      created_at:  created_at,
+      updated_at:  created_at,
+      pinned:      pinned,
+      source:      source,
+      project_id:  project_id,
+      messages:    []
     }
+    data[:archived_at] = archived_at if archived_at
     File.write(File.join(temp_dir, filename), JSON.generate(data))
   end
 
@@ -106,5 +107,16 @@ RSpec.describe Clacky::SessionManager, "#cleanup_by_count" do
     expect(evicted).to eq(1)
     expect(active_ids).to contain_exactly("reg1", "ext_free")
     expect(trashed_ids).to contain_exactly("ext_proj")
+  end
+
+  it "never soft-deletes archived sessions and does not count them toward the cap" do
+    write_session(id: "keep1", created_at: "2026-01-01T00:00:00Z")
+    write_session(id: "keep2", created_at: "2026-02-01T00:00:00Z")
+    # Oldest of all, but the user curated it into the archive on purpose.
+    write_session(id: "arch", created_at: "2025-01-01T00:00:00Z", archived_at: "2025-02-01T00:00:00Z")
+
+    expect(manager.cleanup_by_count(keep: 2)).to eq(0)
+    expect(active_ids).to contain_exactly("keep1", "keep2", "arch")
+    expect(trashed_ids).to be_empty
   end
 end

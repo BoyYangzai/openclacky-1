@@ -562,7 +562,7 @@ Confirm once more:
 ```
 
 On confirmation, use the `trash` tool (NOT raw `rm`) so the file lands in
-Recently Deleted and can be recovered via File Recall. Report what you did.
+the Recycle Bin and can be recovered from there. Report what you did.
 
 ### C.7. Close
 
