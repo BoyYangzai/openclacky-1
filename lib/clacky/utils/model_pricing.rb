@@ -538,6 +538,8 @@ module Clacky
       # through 2026-12-31 before settling at $1.50/$7.50 (list price shown).
       # Cache write billed at input rate (Vertex doesn't expose a separate
       # cache-write charge in the OpenAI shim usage response).
+      # No longer offered through the gateway; the entry stays so records
+      # billed before the retirement still resolve to a price.
       "gemini-3.7-flash" => {
         input: {
           default: 1.50,

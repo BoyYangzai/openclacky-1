@@ -58,8 +58,7 @@ module Clacky
           "abs-gpt-5.6-terra",
           "abs-gpt-5.6-luna",
           "or-gemini-3-1-pro",
-          "or-gemini-3-8-flash",
-          "or-gemini-3-7-flash"
+          "or-gemini-3-8-flash"
         ],
         # Image generation models served by the openclacky platform
         # gateway. The gateway exposes a standard OpenAI-compatible
@@ -111,12 +110,10 @@ module Clacky
         # audio parts). The gateway returns transcription text.
         "stt_models" => [
           "or-stt-gemini-3-8-flash",
-          "or-stt-gemini-3-7-flash",
           "or-stt-gemini-1-5-pro"
         ],
         "stt_model_aliases" => {
           "or-stt-gemini-3-8-flash" => "Gemini 3.8 Flash STT",
-          "or-stt-gemini-3-7-flash" => "Gemini 3.7 Flash STT",
           "or-stt-gemini-1-5-pro"   => "Gemini 1.5 Pro STT"
         },
         "default_stt_model" => "or-stt-gemini-3-8-flash",
@@ -125,12 +122,10 @@ module Clacky
         # parts). The gateway returns analysis text.
         "video_understanding_models" => [
           "or-gemini-3-8-flash",
-          "or-gemini-3-7-flash",
           "or-gemini-3-1-pro"
         ],
         "video_understanding_model_aliases" => {
           "or-gemini-3-8-flash" => "Gemini 3.8 Flash",
-          "or-gemini-3-7-flash" => "Gemini 3.7 Flash",
           "or-gemini-3-1-pro"   => "Gemini 3.1 Pro"
         },
         "default_video_understanding_model" => "or-gemini-3-8-flash",
