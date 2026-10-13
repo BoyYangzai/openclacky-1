@@ -13906,6 +13906,7 @@ body.setup-mode {
   background: color-mix(in srgb, var(--color-bg-hover) 70%, var(--color-bg-secondary));
   border-radius: 8px;
   padding: 3px;
+  transition: background 0.35s ease;
 }
 .segmented-control__btn {
   padding: 0.3125rem 0.75rem;
@@ -13915,7 +13916,7 @@ body.setup-mode {
   font-size: 0.8125rem;
   cursor: pointer;
   border-radius: 6px;
-  transition: all 0.15s ease;
+  transition: all 0.35s ease;
   white-space: nowrap;
 }
 .segmented-control__btn:hover:not(.active) {
@@ -13937,6 +13938,12 @@ body.setup-mode {
 [data-theme="bluedark"] .segmented-control__btn.active {
   background: var(--color-bg-hover);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+/* Hover deepens the track itself rather than the button under the cursor,
+   so the active pill never competes with a second raised surface. Declared
+   after the theme overrides above, which it has to outrank on dark tracks. */
+.segmented-control:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 2%, var(--color-bg-hover));
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
