@@ -1,12 +1,17 @@
 "use strict";
 
-// Regression harness for the workspace viewer's tab context menu.
+// Regression harness for the workspace viewer's tab context menu and image
+// zoom.
 //
 // Right-clicking an open file tab used to do nothing — the only way to close a
 // file was the small × on the tab, and files could only reach the composer /
 // be revealed on disk from the tree. The menu now offers the file actions the
 // tree already had (add to chat, reveal, copy path, copy relative path,
 // download) plus closing this tab or every tab at once.
+//
+// Pictures used to be locked to "fit and nothing else". Their pane now scales
+// and pans, so the same stub drives the buttons, the wheel, the double click
+// and a drag.
 //
 // The real view.js runs against a DOM stub; only I/O is faked.
 
@@ -20,6 +25,13 @@ const sourcePath = name => path.resolve(__dirname, "../../lib/clacky/web", name)
 const autoStub = (extra = {}) => new Proxy(extra, {
   get: (target, key) => (key in target ? target[key] : () => {}),
 });
+
+// The image pane hands the fetched bytes to an object URL. Node's global URL
+// parses but has no such pair, so the context gets a subclass that does.
+class URLWithObjectUrls extends URL {
+  static createObjectURL() { return "blob:stub"; }
+  static revokeObjectURL() {}
+}
 
 function parseSelector(selector) {
   const attrs = [];
@@ -66,6 +78,18 @@ class Element {
     this._innerHTML = "";
     this.textContent = "";
     this.focusCount = 0;
+    // Layout metrics the zoom pane measures. They stay 0 until a test sets
+    // them, which reads as "no viewport and no picture" — the same thing the
+    // pane sees before the bytes arrive.
+    this.clientWidth = 0;
+    this.clientHeight = 0;
+    this.offsetWidth = 0;
+    this.offsetHeight = 0;
+    this.naturalWidth = 0;
+    this.naturalHeight = 0;
+    this.complete = false;
+    this.setPointerCapture = () => {};
+    this.releasePointerCapture = () => {};
     this.classList = {
       add: n => this.classes.add(n),
       remove: n => this.classes.delete(n),
@@ -140,6 +164,9 @@ const TREE = {
     // file the viewer can reopen from a saved record.
     { name: "notes.pdf",   path: "notes.pdf",   type: "file", size: 5000 },
     { name: "guide.pdf",   path: "guide.pdf",   type: "file", size: 800 },
+    // Pictures take the zoom pane, which is the only pane that measures its
+    // container instead of just filling it.
+    { name: "photo.png",   path: "photo.png",   type: "file", size: 200000 },
   ],
 };
 
@@ -163,6 +190,7 @@ function boot(opts = {}) {
   };
 
   const sent = [];
+  const observers = [];
   // Restoring a deleted file logs the failure on purpose (silence is for the
   // user, not the console), so the harness keeps that line out of its output.
   const console = Object.assign({}, global.console, {
@@ -172,7 +200,7 @@ function boot(opts = {}) {
     },
   });
   const context = {
-    console, Date, Map, Set, Math, JSON, Promise, URL, URLSearchParams,
+    console, Date, Map, Set, Math, JSON, Promise, URL: URLWithObjectUrls, URLSearchParams,
     setTimeout: (fn, ms, ...args) => {
       const timer = setTimeout(fn, ms, ...args);
       if (timer.unref) timer.unref();
@@ -180,6 +208,13 @@ function boot(opts = {}) {
     },
     clearTimeout,
     requestAnimationFrame: fn => setTimeout(fn, 0),
+    // The zoom pane watches its own box. Each observer is kept so a test can
+    // report a new size the way the browser would.
+    ResizeObserver: class {
+      constructor(cb) { this.cb = cb; this.targets = []; observers.push(this); }
+      observe(el) { this.targets.push(el); }
+      disconnect() { this.disconnected = true; }
+    },
     CSS: { escape: s => String(s) },
     navigator: { platform: "MacIntel", clipboard: { writeText: async () => {} } },
     document,
@@ -194,7 +229,7 @@ function boot(opts = {}) {
       if (options && String(options.body || "").includes("missing")) {
         return { ok: false, status: 404, json: async () => ({ error: "file not found" }) };
       }
-      return { ok: true, status: 200, json: async () => ({ ok: true }) };
+      return { ok: true, status: 200, json: async () => ({ ok: true }), blob: async () => ({}) };
     },
     localStorage: {
       getItem: key => (storage.has(key) ? storage.get(key) : null),
@@ -239,7 +274,7 @@ function boot(opts = {}) {
   WorkspaceView.mount(container, {});
 
   return {
-    Sessions, document, container, fetches, confirms, sent, storage, toasts,
+    Sessions, document, container, fetches, confirms, sent, observers, storage, toasts,
     input: document.getElementById("user-input"),
     tree: container.querySelector(".wt-tree"),
   };
@@ -263,6 +298,30 @@ const activeTabLabel = w => {
 async function openFile(w, relPath) {
   row(w, relPath).handlers.click({ preventDefault() {}, stopPropagation() {} });
   await settle();
+}
+
+// The stub has no layout engine, so a test that needs the zoom pane measured
+// writes the numbers the browser would have reported — 1600×1200 of picture
+// inside an 800×600 pane — and replays the load event that follows the bytes.
+async function openImage(w) {
+  await openFile(w, "photo.png");
+  const viewport = w.container.querySelector(".wv-zoom");
+  const img = viewport.querySelector("img");
+  viewport.clientWidth = 800;
+  viewport.clientHeight = 600;
+  img.naturalWidth = 1600;
+  img.naturalHeight = 1200;
+  img.handlers.load();
+  return {
+    viewport,
+    img,
+    ...zoomButtons(w),
+  };
+}
+
+function zoomButtons(w) {
+  const bar = w.container.querySelector(".wv-zoom-bar");
+  return { bar, out: bar.children[0], level: bar.children[1], in: bar.children[2], fit: bar.children[3] };
 }
 
 // Right-click a tab the way the DOM would: clientX/Y only position the menu.
@@ -495,6 +554,93 @@ async function tests() {
 
     assert.deepEqual(tabLabels(reloaded), ["guide.pdf"], "the reload lands on what was left open");
     assert.equal(activeTabLabel(reloaded), "guide.pdf", "and on the tab that was in front");
+  }
+
+  // 14. A picture opens fitted: 1600×1200 in an 800×600 pane reads 50%, because
+  //     the number is a real pixel ratio rather than a share of the pane.
+  {
+    const w = boot();
+    await settle();
+    const { img, level } = await openImage(w);
+
+    assert.equal(level.textContent, "50%", "an oversized picture opens fitted to the pane");
+    assert.equal(img.style.transform, "translate(0px, 0px) scale(0.5)", "the fitted scale is applied to the image");
+  }
+
+  // 15. The buttons step the zoom a quarter at a time, in both directions, and
+  //     "fit" brings the whole picture back.
+  {
+    const w = boot();
+    await settle();
+    const { img } = await openImage(w);
+    const b = zoomButtons(w);
+
+    b.in.click();
+    assert.equal(b.level.textContent, "63%", "+ steps up by a quarter");
+    b.out.click();
+    b.out.click();
+    assert.equal(b.level.textContent, "40%", "− steps down, past the fit if asked");
+    b.fit.click();
+    assert.equal(b.level.textContent, "50%", "fit puts the whole picture back on screen");
+    assert.equal(img.style.transform, "translate(0px, 0px) scale(0.5)", "and recentres it");
+  }
+
+  // 16. The wheel, a drag and a double click drive the same scale, and a drag
+  //     stops at the edge of the picture instead of losing it off-screen.
+  {
+    const w = boot();
+    await settle();
+    const { viewport, img, level } = await openImage(w);
+    const act = (kind, ev) => viewport.handlers[kind](Object.assign({ preventDefault() {} }, ev));
+
+    act("wheel", { deltaY: -100, clientX: 0, clientY: 0 });
+    assert.equal(level.textContent, "61%", "one wheel notch zooms in by about a quarter");
+
+    zoomButtons(w).fit.click();  // back to a round 50%, so the pan has an exact expectation
+    act("pointerdown", { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    act("pointermove", { pointerId: 1, clientX: 500, clientY: 400 });
+    act("pointerup", { pointerId: 1 });
+    assert.equal(img.style.transform, "translate(0px, 0px) scale(0.5)",
+      "a picture that is exactly the size of the pane has nowhere to be dragged");
+
+    zoomButtons(w).in.click();
+    act("pointerdown", { button: 0, pointerId: 1, clientX: 0, clientY: 0 });
+    act("pointermove", { pointerId: 1, clientX: 500, clientY: 400 });
+    act("pointerup", { pointerId: 1 });
+    assert.equal(img.style.transform, "translate(100px, 75px) scale(0.625)",
+      "once it overflows, a drag pans to the edge of the picture and stops there");
+
+    act("dblclick", { clientX: 0, clientY: 0 });
+    assert.equal(level.textContent, "50%", "a double click returns a zoomed picture to the fit");
+    act("dblclick", { clientX: 0, clientY: 0 });
+    assert.equal(level.textContent, "100%", "and doubles it when the picture is already fitted");
+  }
+
+  // 17. A pane that changes size refits the picture — the aside can be dragged,
+  //     and a tab opened in the background only learns its real size once it is
+  //     shown — but a zoom the user asked for is left where they put it.
+  {
+    const w = boot();
+    await settle();
+    const { viewport, level } = await openImage(w);
+    assert.equal(level.textContent, "50%", "the picture opens fitted");
+
+    const resize = (width, height) => {
+      viewport.clientWidth = width;
+      viewport.clientHeight = height;
+      w.observers.forEach(o => o.cb());
+    };
+
+    resize(400, 300);
+    assert.equal(level.textContent, "25%", "a smaller pane fits the picture smaller");
+
+    zoomButtons(w).in.click();
+    assert.equal(level.textContent, "31%", "the user zooms in");
+    resize(800, 600);
+    assert.equal(level.textContent, "31%", "a resize after that leaves the zoom alone");
+
+    await clickTabMenu(w, openTabMenu(w, 0), "closetab", "photo.png");
+    assert.ok(w.observers.every(o => o.disconnected), "closing the tab stops watching the box");
   }
 }
 
