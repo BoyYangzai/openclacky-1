@@ -481,8 +481,8 @@ module Clacky
       private def auto_name_session(agent, input)
         return unless agent.history.empty?
 
-        auto_name = input.to_s.gsub(/\s+/, " ").strip[0, 30]
-        auto_name += "…" if input.to_s.strip.length > 30
+        auto_name = input.to_s.gsub(/\s+/, " ").strip[0, 80]
+        auto_name += "…" if input.to_s.strip.length > 80
         agent.rename(auto_name)
       end
 

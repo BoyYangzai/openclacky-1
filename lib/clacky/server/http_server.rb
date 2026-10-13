@@ -7924,8 +7924,8 @@ module Clacky
         # Auto-name the session from the first user message (before agent starts running).
         # Skip if the name looks like it was set by the user (not a system-generated "Session N").
         if agent.history.empty? && agent.name.match?(/\ASession \d+\z/)
-          auto_name = content.gsub(/\s+/, " ").strip[0, 30]
-          auto_name += "…" if content.strip.length > 30
+          auto_name = content.gsub(/\s+/, " ").strip[0, 80]
+          auto_name += "…" if content.strip.length > 80
           agent.rename(auto_name)
           broadcast(session_id, { type: "session_renamed", session_id: session_id, name: auto_name })
         end
