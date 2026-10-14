@@ -97,6 +97,44 @@ RSpec.describe Clacky::MessageHistory do
     end
   end
 
+  describe "#replace_user_message" do
+    it "replaces only the user turn matching the stable message id" do
+      history.append(user_msg("first", message_id: "message-1", task_id: "task-1", created_at: 1.0))
+      history.append(user_msg("second", message_id: "message-2", task_id: "task-1", created_at: 1.0))
+
+      replaced = history.replace_user_message(
+        message_id: "message-1",
+        message: user_msg("resolved", message_id: "message-1", task_id: "task-1", created_at: 1.0,
+                          display_files: [{ name: "report.pdf", type: "pdf" }])
+      )
+
+      expect(replaced).to be(true)
+      expect(history.to_a.map { |message| message[:content] }).to eq(%w[resolved second])
+      expect(history.to_a.first[:display_files]).to eq([{ name: "report.pdf", type: "pdf" }])
+    end
+
+    it "returns false without changing history when the turn is absent" do
+      history.append(user_msg("original", task_id: "task-1", created_at: 1.0))
+
+      expect(history.replace_user_message(
+        message_id: "missing",
+        message: user_msg("replacement", message_id: "missing", task_id: "task-2", created_at: 1.0)
+      )).to be(false)
+      expect(history.to_a.first[:content]).to eq("original")
+    end
+  end
+
+  describe "#truncate_from_message" do
+    it "uses the stable message id when timestamps collide" do
+      history.append(user_msg("first", message_id: "message-1", created_at: 1.0))
+      history.append(user_msg("second", message_id: "message-2", created_at: 1.0))
+
+      history.truncate_from_message("message-2")
+
+      expect(history.to_a.map { |message| message[:content] }).to eq(["first"])
+    end
+  end
+
   # ─────────────────────────────────────────────
   # pop_last
   # ─────────────────────────────────────────────
@@ -317,7 +355,8 @@ RSpec.describe Clacky::MessageHistory do
   # ─────────────────────────────────────────────
   describe "#to_api" do
     it "strips internal fields (task_id, created_at, system_injected, etc.)" do
-      history.append(user_msg("hello", task_id: 1, created_at: 123.0, system_injected: true,
+      history.append(user_msg("hello", message_id: "message-1", task_id: 1,
+                                       created_at: 123.0, system_injected: true,
                                        session_context: true, memory_update: true))
       api_msgs = history.to_api
       expect(api_msgs.first.keys).to contain_exactly(:role, :content)

@@ -932,6 +932,33 @@ module Clacky
     private def append_user_input(user_input, files: nil, reference_contexts: nil,
                                   display_text: nil, created_at: nil, references_display: nil,
                                   task_id: @current_task_id)
+      # Resolve lightweight metadata first, then commit the accepted user turn
+      # before any attachment parser/OCR/sidecar work can block or fail. Session
+      # switching and graceful shutdown both read from @history, so the turn
+      # must already be authoritative while those slow operations are running.
+      skill_command = parse_skill_command(user_input)
+      skill_command_display = if skill_command[:found] && skill_command[:skill]
+                                skill_command[:skill].display_name(Thread.current[:lang])
+                              end
+      created_at ||= Time.now.to_f
+      message_id = SecureRandom.uuid
+      staged = Array(files).any?
+      staged_display_files = display_files_for(files)
+      message_metadata = {
+        role: "user", message_id: message_id, task_id: task_id, created_at: created_at,
+        display_text: display_text,
+        skill_command: skill_command[:found] ? skill_command[:skill_name] : nil,
+        skill_command_display: skill_command_display,
+        display_references: Array(references_display).empty? ? nil : references_display
+      }
+      if staged
+        @history.append(message_metadata.merge(
+          content: user_input,
+          display_files: staged_display_files.empty? ? nil : staged_display_files
+        ))
+        staged_message_id = message_id
+      end
+
       # Split files into vision images and disk files; downgrade oversized images to disk
       image_files, disk_files = partition_files(Array(files))
       vision_images, downgraded = resolve_vision_images(image_files)
@@ -1003,36 +1030,20 @@ module Clacky
       # stored here — they recover from image_url blocks in user_content. Downgraded
       # images (provider has no vision / too large / OCR'd) DO need path here so the
       # UI can re-render them from the on-disk copy across session switches.
-      display_files = all_disk_files.filter_map do |f|
-        # @mention file/directory references are replayed from display_references
-        # (with mention badges), so skip them here to avoid double-rendering as
-        # plain attachment badges.
-        next if f[:reference] || f["reference"]
-        name = f[:name] || f["name"]
-        next unless name
-        { name: name, type: f[:type] || f["type"] || "file",
-          path: f[:path] || f["path"],
-          preview_path: f[:preview_path] || f["preview_path"] }
+      display_files = display_files_for(all_disk_files)
+      resolved_message = message_metadata.merge(
+        content: user_content,
+        display_files: display_files.empty? ? nil : display_files
+      )
+      if staged
+        replaced = @history.replace_user_message(
+          message_id: message_id,
+          message: resolved_message
+        )
+        raise AgentError, "Accepted user message disappeared during attachment processing" unless replaced
+      else
+        @history.append(resolved_message)
       end
-
-      # Resolved once here (not after append) so the user message can carry the
-      # confirmed skill name: only a skill that actually dispatches gets marked,
-      # so the UI never highlights a typo'd or unavailable command. The display
-      # name is resolved against the client's language (Thread.current[:lang],
-      # seeded from the WS message / X-Lang header) so the Web UI and third-party
-      # clients can render a localized label without re-resolving the skill.
-      skill_command = parse_skill_command(user_input)
-      skill_command_display = if skill_command[:found] && skill_command[:skill]
-                                skill_command[:skill].display_name(Thread.current[:lang])
-                              end
-
-      created_at ||= Time.now.to_f
-      @history.append({ role: "user", content: user_content, task_id: task_id, created_at: created_at,
-                        display_text: display_text,
-                        skill_command: skill_command[:found] ? skill_command[:skill_name] : nil,
-                        skill_command_display: skill_command_display,
-                        display_files: display_files.empty? ? nil : display_files,
-                        display_references: Array(references_display).empty? ? nil : references_display })
 
       # Inject disk file references as a system_injected message so:
       #   - LLM sees the file info (system_injected is NOT stripped from to_api)
@@ -1148,6 +1159,36 @@ module Clacky
       # skill-declared model not found) still stops the progress spinner.
       inject_skill_command_as_assistant_message(skill_command, task_id)
 
+    rescue Clacky::AgentInterrupted, StandardError
+      # The staged turn exists only to make an accepted upload replayable while
+      # attachment work is in progress. If that work crashes, remove this turn
+      # and anything injected after it so the next request cannot inherit a
+      # half-resolved attachment context. Parser failures returned as FileRef
+      # metadata do not raise and therefore remain visible/actionable.
+      @history.truncate_from_message(staged_message_id) if staged_message_id
+      raise
+    end
+
+    # Build replay-only attachment metadata without parsing file contents.
+    # @mention references render through display_references and must not also
+    # appear as plain attachment badges.
+    private def display_files_for(files)
+      Array(files).filter_map do |file|
+        next if file[:reference] || file["reference"]
+
+        name = file[:name] || file["name"]
+        next unless name
+
+        mime_type = file[:mime_type] || file["mime_type"]
+        type = file[:type] || file["type"]
+        type ||= "image" if mime_type.to_s.start_with?("image/")
+        {
+          name: name,
+          type: type || "file",
+          path: file[:path] || file["path"],
+          preview_path: file[:preview_path] || file["preview_path"]
+        }
+      end
     end
 
     def enqueue_input(content, delivery: :queue, **options)
