@@ -1105,25 +1105,48 @@ module Clacky
     # platform-served "abs-claude-*" and a BYOK "claude-*" normalise to the
     # same PRICING_TABLE entry, so discounting the table itself would silently
     # cut the price for customers who bring their own credentials. The "oc-*"
-    # aliases exist only on the platform side, so their rules stay narrower than
-    # the BYOK ids leaning on the same list price.
+    # and "or-*" aliases exist only on the platform side, so their rules stay
+    # narrower than the BYOK ids leaning on the same list price.
+    #
+    # Rates follow what the ciyuan upstream bills us. Claude (cc-max group)
+    # costs 0.368x of list and Grok 4.7 (grok group) about 0.086x, so both
+    # carry a deep cut; Kimi K3 (self-hosted tier) costs 0.6x and covers 10%,
+    # while GLM still arrives at 0.8x under its own group and covers only 5%.
+    # Those four are "channel" discounts: they exist because a third-party
+    # channel serves the model below list, which is what the picker tooltip
+    # tells the user. The "or-*" lane is different - it is Google's own Vertex
+    # endpoint, billed at list, and its 20% launch promo lives in the
+    # gateway's VERTEX_DISCOUNT knob, which this table cannot read, so the two
+    # are kept in sync by hand. Vertex promos carry reason "promo" so the UI
+    # explains them as a limited-time offer instead of claiming the model is
+    # served through a third party.
     # The gateway mirrors this list - see seriesDiscount in llm_proxy.
     DISCOUNT_RULES = [
-      { match: /\Aabs-claude-/,   rate: 0.8 },  # Claude series - 20% off
-      { match: /\Aoc-glm-/,       rate: 0.95 }, # GLM via TokHub - 5% off
-      { match: /\Aoc-kimi-/,      rate: 0.95 }, # Kimi via TokHub - 5% off
-      { match: /\Aoc-grok-/,      rate: 0.95 }  # Grok via TokHub - 5% off
+      { match: /\Aabs-claude-/,      rate: 0.6,  reason: "channel" }, # Claude via ciyuan cc-max - 40% off
+      { match: /\Aoc-glm-/,          rate: 0.95, reason: "channel" }, # GLM via ciyuan glm - 5% off
+      { match: /\Aoc-kimi-/,         rate: 0.9,  reason: "channel" }, # Kimi K3 via ciyuan - 10% off
+      { match: /\Aoc-grok-/,         rate: 0.3,  reason: "channel" }, # Grok 4.7 via ciyuan grok - 70% off
+      { match: /\Aor-(gemini|veo)-/, rate: 0.8,  reason: "promo" }    # Vertex Gemini/Veo launch promo - 20% off
     ].freeze
 
     class << self
+      # Matching promotion for a model alias, or nil when none applies.
+      #   rate   - multiplier applied to the list price
+      #   reason - "channel" when a third-party channel feeds the model below
+      #            list, "promo" when the vendor's own endpoint is discounted
+      def discount_info(model)
+        name = model.to_s.downcase
+        return nil if name.empty?
+
+        rule = DISCOUNT_RULES.find { |r| r[:match].match?(name) }
+        rule ? { rate: rule[:rate], reason: rule[:reason] } : nil
+      end
+
       # Multiplier applied to the final price for a model alias: 1.0 when no
       # promotion applies, otherwise the matching rule's rate.
       def discount_rate(model)
-        name = model.to_s.downcase
-        return 1.0 if name.empty?
-
-        rule = DISCOUNT_RULES.find { |r| r[:match].match?(name) }
-        rule ? rule[:rate] : 1.0
+        info = discount_info(model)
+        info ? info[:rate] : 1.0
       end
 
       # Calculate cost for the given model and usage

@@ -147,8 +147,8 @@ RSpec.describe Clacky::ModelPricing do
         )
         # Input: (50,000 / 1,000,000) * $0.10 = $0.005
         # Output: (10,000 / 1,000,000) * $0.50 = $0.005
-        # Total: $0.01, minus the Claude promo → $0.008
-        expect(under[:cost]).to be_within(0.0001).of(0.008)
+        # Total: $0.01, minus the Claude promo → $0.006
+        expect(under[:cost]).to be_within(0.0001).of(0.006)
 
         over = described_class.calculate_cost(
           model: "abs-claude-haiku-5-5",
@@ -156,8 +156,8 @@ RSpec.describe Clacky::ModelPricing do
         )
         # Input: (120,000 / 1,000,000) * $0.50 = $0.06
         # Output: (10,000 / 1,000,000) * $2.50 = $0.025
-        # Total: $0.085, minus the Claude promo → $0.068
-        expect(over[:cost]).to be_within(0.0001).of(0.068)
+        # Total: $0.085, minus the Claude promo → $0.051
+        expect(over[:cost]).to be_within(0.0001).of(0.051)
       end
 
       it "keeps exactly 100K on the cheap card (the cut-off is exclusive)" do
@@ -165,8 +165,8 @@ RSpec.describe Clacky::ModelPricing do
           model: "abs-claude-haiku-5-5",
           usage: { prompt_tokens: 100_000, completion_tokens: 0 }
         )
-        # (100,000 / 1,000,000) * $0.10 = $0.01 → $0.008 after the promo
-        expect(result[:cost]).to be_within(0.0001).of(0.008)
+        # (100,000 / 1,000,000) * $0.10 = $0.01 → $0.006 after the promo
+        expect(result[:cost]).to be_within(0.0001).of(0.006)
       end
 
       it "tiers its cache rates at 100K too" do
@@ -182,9 +182,9 @@ RSpec.describe Clacky::ModelPricing do
         #   (prompt_tokens includes the 20,000 cache reads, so they are billed below)
         # Cache write: (10,000 / 1,000,000) * $0.625 = $0.00625
         # Cache read: (20,000 / 1,000,000) * $0.05 = $0.001
-        # Total: $0.05725, minus the Claude promo → $0.0458
+        # Total: $0.05725, minus the Claude promo → $0.03435
         result = described_class.calculate_cost(model: "abs-claude-haiku-5-5", usage: usage)
-        expect(result[:cost]).to be_within(0.0001).of(0.0458)
+        expect(result[:cost]).to be_within(0.0001).of(0.03435)
       end
 
       it "does not collide with claude-haiku-4.5 (regression guard)" do
@@ -933,10 +933,10 @@ RSpec.describe Clacky::ModelPricing do
     it "applies the Claude discount to platform-served aliases" do
       usage = { prompt_tokens: 1_000_000, completion_tokens: 1_000_000 }
 
-      # Sonnet 5 lists at $2 in / $10 out, so 8折 bills $1.60 / $8.00.
+      # Sonnet 5 lists at $2 in / $10 out, so 6折 bills $1.20 / $6.00.
       result = described_class.calculate_cost(model: "abs-claude-sonnet-5", usage: usage)
 
-      expect(result[:cost]).to be_within(0.001).of(9.60)
+      expect(result[:cost]).to be_within(0.001).of(7.20)
       expect(result[:source]).to eq(:price)
     end
 
@@ -955,9 +955,9 @@ RSpec.describe Clacky::ModelPricing do
       expect(described_class.calculate_cost(model: "oc-glm-5.3", usage: usage)[:cost])
         .to be_within(0.001).of(4.8849)
       expect(described_class.calculate_cost(model: "oc-kimi-k3", usage: usage)[:cost])
-        .to be_within(0.001).of(17.10)
+        .to be_within(0.001).of(16.20)
       expect(described_class.calculate_cost(model: "oc-grok-4.7", usage: usage)[:cost])
-        .to be_within(0.001).of(7.60)
+        .to be_within(0.001).of(2.40)
     end
 
     it "leaves the BYOK ids sitting behind those same models at list price" do
@@ -972,19 +972,33 @@ RSpec.describe Clacky::ModelPricing do
     end
 
     it "matches the whole alias family and nothing else" do
-      expect(described_class.discount_rate("abs-claude-opus-5-5")).to eq(0.8)
-      expect(described_class.discount_rate("abs-claude-haiku-4-5")).to eq(0.8)
-      expect(described_class.discount_rate("abs-claude-haiku-5-5")).to eq(0.8)
+      expect(described_class.discount_rate("abs-claude-opus-5-5")).to eq(0.6)
+      expect(described_class.discount_rate("abs-claude-haiku-4-5")).to eq(0.6)
+      expect(described_class.discount_rate("abs-claude-haiku-5-5")).to eq(0.6)
       expect(described_class.discount_rate("claude-opus-5-5")).to eq(1.0)
       expect(described_class.discount_rate("oc-glm-5.3")).to eq(0.95)
-      expect(described_class.discount_rate("oc-kimi-k3")).to eq(0.95)
-      expect(described_class.discount_rate("oc-grok-4.7")).to eq(0.95)
+      expect(described_class.discount_rate("oc-kimi-k3")).to eq(0.9)
+      expect(described_class.discount_rate("oc-grok-4.7")).to eq(0.3)
+      expect(described_class.discount_rate("or-gemini-4-argon")).to eq(0.8)
+      expect(described_class.discount_rate("or-veo-3-1")).to eq(0.8)
       expect(described_class.discount_rate("glm-5.3")).to eq(1.0)
       expect(described_class.discount_rate("kimi-k3")).to eq(1.0)
       expect(described_class.discount_rate("grok-4.7")).to eq(1.0)
+      expect(described_class.discount_rate("gemini-4-argon")).to eq(1.0)
+      expect(described_class.discount_rate("veo-3-1")).to eq(1.0)
       expect(described_class.discount_rate("minimax-m2.7")).to eq(1.0)
       expect(described_class.discount_rate("abs-gpt-6.1-sol")).to eq(1.0)
       expect(described_class.discount_rate(nil)).to eq(1.0)
+    end
+
+    it "reports where a promotion comes from" do
+      expect(described_class.discount_info("abs-claude-opus-5-5")).to eq(rate: 0.6, reason: "channel")
+      expect(described_class.discount_info("oc-kimi-k3")).to eq(rate: 0.9, reason: "channel")
+      expect(described_class.discount_info("oc-grok-4.7")).to eq(rate: 0.3, reason: "channel")
+      expect(described_class.discount_info("or-gemini-3-1-pro")).to eq(rate: 0.8, reason: "promo")
+      expect(described_class.discount_info("or-veo-3-1")).to eq(rate: 0.8, reason: "promo")
+      expect(described_class.discount_info("gemini-4-argon")).to be_nil
+      expect(described_class.discount_info(nil)).to be_nil
     end
   end
 
@@ -1321,8 +1335,8 @@ RSpec.describe Clacky::ModelPricing do
       # Regular input: (1_000_000 - 200_000)/1M * $2.00 = $1.60
       # Cache read:     200_000 / 1M * $0.10            = $0.02
       # Output:       1_000_000 / 1M * $10.00           = $10.00
-      # Total: $11.62
-      expect(result[:cost]).to be_within(0.0001).of(11.62)
+      # Total: $11.62, minus the Vertex launch promo (8折) → $9.296
+      expect(result[:cost]).to be_within(0.0001).of(9.296)
       expect(result[:source]).to eq(:price)
     end
   end
@@ -1338,8 +1352,8 @@ RSpec.describe Clacky::ModelPricing do
       # Regular input: (1_000_000 - 200_000)/1M * $1.50 = $1.20
       # Cache read:     200_000 / 1M * $0.15            = $0.03
       # Output:       1_000_000 / 1M * $7.50            = $7.50
-      # Total: $8.73
-      expect(result[:cost]).to be_within(0.0001).of(8.73)
+      # Total: $8.73, minus the Vertex launch promo (8折) → $6.984
+      expect(result[:cost]).to be_within(0.0001).of(6.984)
       expect(result[:source]).to eq(:price)
     end
 

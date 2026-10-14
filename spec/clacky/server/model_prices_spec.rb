@@ -32,19 +32,23 @@ RSpec.describe Clacky::Server::ModelPrices do
       base_total = 2.0 + 10.0
 
       expect(result[:prices]["claude-sonnet-4-6"][:ratio]).to be_within(0.001).of((3.0 + 15.0) / base_total)
-      expect(result[:prices]["or-gemini-3-5-flash"][:ratio]).to be_within(0.001).of((0.5 + 3.0) / base_total)
+      expect(result[:prices]["or-gemini-3-5-flash"][:ratio]).to be_within(0.001).of((0.4 + 2.4) / base_total)
     end
 
     it "returns input/output prices alongside the ratio" do
       result = described_class.build("or-gemini-3-5-flash")
 
-      expect(result[:prices]["or-gemini-3-5-flash"]).to eq(in: 0.5, out: 3.0, ratio: (0.5 + 3.0) / 12.0)
+      expect(result[:prices]["or-gemini-3-5-flash"]).to eq(
+        in: 0.4, out: 2.4, ratio: (0.4 + 2.4) / 12.0, discount: { rate: 0.8, reason: "promo" }
+      )
     end
 
     it "applies provider prefix and alias normalization" do
       result = described_class.build("or-gemini-3-5-flash,claude-sonnet-4-6")
 
-      expect(result[:prices]["or-gemini-3-5-flash"]).to eq(in: 0.5, out: 3.0, ratio: (0.5 + 3.0) / 12.0)
+      expect(result[:prices]["or-gemini-3-5-flash"]).to eq(
+        in: 0.4, out: 2.4, ratio: (0.4 + 2.4) / 12.0, discount: { rate: 0.8, reason: "promo" }
+      )
       expect(result[:prices]["claude-sonnet-4-6"][:ratio]).to eq((3.0 + 15.0) / 12.0)
     end
 
@@ -74,10 +78,10 @@ RSpec.describe Clacky::Server::ModelPrices do
         result = described_class.build("abs-claude-sonnet-5,abs-claude-fable-5")
 
         expect(result[:prices]["abs-claude-sonnet-5"]).to eq(
-          in: 1.6, out: 8.0, ratio: (1.6 + 8.0) / base_total, discount: { rate: 0.8 }
+          in: 1.2, out: 6.0, ratio: (1.2 + 6.0) / base_total, discount: { rate: 0.6, reason: "channel" }
         )
         expect(result[:prices]["abs-claude-fable-5"]).to eq(
-          in: 8.0, out: 40.0, ratio: (8.0 + 40.0) / base_total, discount: { rate: 0.8 }
+          in: 6.0, out: 30.0, ratio: (6.0 + 30.0) / base_total, discount: { rate: 0.6, reason: "channel" }
         )
       end
 
@@ -85,7 +89,7 @@ RSpec.describe Clacky::Server::ModelPrices do
         result = described_class.build("abs-claude-haiku-5-5")
 
         expect(result[:prices]["abs-claude-haiku-5-5"]).to eq(
-          in: 0.08, out: 0.40, ratio: (0.08 + 0.40) / base_total, discount: { rate: 0.8 }
+          in: 0.06, out: 0.3, ratio: (0.06 + 0.3) / base_total, discount: { rate: 0.6, reason: "channel" }
         )
       end
 
@@ -103,27 +107,40 @@ RSpec.describe Clacky::Server::ModelPrices do
         expect(result[:prices]["claude-opus-5"]).to eq(in: 5.0, out: 25.0, ratio: (5.0 + 25.0) / base_total)
       end
 
-      it "applies the TokHub promotion to the oc-prefixed aliases" do
+      it "applies the ciyuan promotion to the oc-prefixed aliases" do
         result = described_class.build("oc-glm-5.3,oc-kimi-k3,oc-grok-4.7")
 
         expect(result[:prices]["oc-glm-5.3"]).to eq(
           in: 1.0849, out: 3.8, ratio: (1.0849 + 3.8) / base_total,
-          discount: { rate: 0.95 }
+          discount: { rate: 0.95, reason: "channel" }
         )
         expect(result[:prices]["oc-kimi-k3"]).to eq(
-          in: 2.85, out: 14.25,
-          ratio: (2.85 + 14.25) / base_total, discount: { rate: 0.95 }
+          in: 2.7, out: 13.5,
+          ratio: (2.7 + 13.5) / base_total, discount: { rate: 0.9, reason: "channel" }
         )
         expect(result[:prices]["oc-grok-4.7"]).to eq(
-          in: 1.9, out: 5.7,
-          ratio: (1.9 + 5.7) / base_total, discount: { rate: 0.95 }
+          in: 0.6, out: 1.8,
+          ratio: (0.6 + 1.8) / base_total, discount: { rate: 0.3, reason: "channel" }
+        )
+      end
+
+      it "reports the Vertex launch promo on the or-prefixed aliases" do
+        result = described_class.build("or-gemini-4-argon,or-gemini-3-1-pro")
+
+        expect(result[:prices]["or-gemini-4-argon"]).to eq(
+          in: 1.6, out: 8.0,
+          ratio: (1.6 + 8.0) / base_total, discount: { rate: 0.8, reason: "promo" }
+        )
+        expect(result[:prices]["or-gemini-3-1-pro"]).to eq(
+          in: 1.6, out: 9.6,
+          ratio: (1.6 + 9.6) / base_total, discount: { rate: 0.8, reason: "promo" }
         )
       end
 
       it "omits the discount flag for models outside the promotion" do
-        result = described_class.build("or-gemini-3-5-flash")
+        result = described_class.build("abs-gpt-6.1-sol")
 
-        expect(result[:prices]["or-gemini-3-5-flash"]).not_to have_key(:discount)
+        expect(result[:prices]["abs-gpt-6.1-sol"]).not_to have_key(:discount)
       end
     end
 

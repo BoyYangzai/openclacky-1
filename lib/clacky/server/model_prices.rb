@@ -6,7 +6,9 @@ module Clacky
     # Resolves each model's input/output price (USD per 1M tokens) from
     # Clacky::ModelPricing plus a cost ratio vs the baseline model, so the
     # web UI never hardcodes prices - updating PRICING_TABLE is enough.
-    # Prices are post-promotion; `discount` is present when a rule applied.
+    # Prices are post-promotion; `discount` is present when a rule applied,
+    # carrying both the rate and its reason ("channel" or "promo") so the UI
+    # can pick the right explanation.
     module ModelPrices
       BASELINE_MODEL = "claude-sonnet-5"
 
@@ -21,7 +23,8 @@ module Clacky
           pricing = Clacky::ModelPricing.get_pricing(name)
           pricing = Clacky::ModelPricing.resolve_deepseek_tier(pricing, now) if pricing && pricing[:deepseek]
           next unless pricing
-          rate = Clacky::ModelPricing.discount_rate(name)
+          info = Clacky::ModelPricing.discount_info(name)
+          rate = info ? info[:rate] : 1.0
           # Rates are not powers of two, so the discounted product carries float
           # noise (3.0 * 0.95 == 2.8499999999999996) that would surface verbatim
           # in the picker tooltips. Four decimals is already finer than any
@@ -29,7 +32,7 @@ module Clacky
           pin  = (pricing[:input][:default] * rate).round(4)
           pout = (pricing[:output][:default] * rate).round(4)
           entry = { in: pin, out: pout, ratio: (pin + pout) / base_total }
-          entry[:discount] = { rate: rate } if rate < 1.0
+          entry[:discount] = { rate: rate, reason: info[:reason] } if rate < 1.0
           prices[name] = entry
         end
 
