@@ -58,6 +58,7 @@ module Clacky
           "abs-gpt-5.6-sol",
           "abs-gpt-5.6-terra",
           "abs-gpt-5.6-luna",
+          "or-gemini-4-argon",
           "or-gemini-3-1-pro",
           "or-gemini-3-8-flash",
           "oc-grok-4.7"

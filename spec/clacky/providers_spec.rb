@@ -791,6 +791,7 @@ RSpec.describe Clacky::Providers do
     end
 
     it "returns 65_536 for Gemini models" do
+      expect(described_class.max_output_for("or-gemini-4-argon")).to eq(65_536)
       expect(described_class.max_output_for("or-gemini-3-6-flash")).to eq(65_536)
       expect(described_class.max_output_for("or-gemini-3-5-flash")).to eq(65_536)
       expect(described_class.max_output_for("or-gemini-3-1-pro")).to eq(65_536)

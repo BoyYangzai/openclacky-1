@@ -523,6 +523,26 @@ module Clacky
         cache:  { write: 0.06, read: 0.02 }
       },
 
+      # Google Gemini 4 Argon (GA 2026-10-13, via Vertex AI). Flat pricing,
+      # 1M context, 1M output ceiling. Price shown is the current official
+      # rate, which doubles on 2026-12-01 ($4.00/$20.00) — update both this
+      # table and vertexChatRoutes then. Cache write bills at the input rate:
+      # Vertex's OpenAI shim only exposes cache-hit (read) tokens.
+      "gemini-4-argon" => {
+        input: {
+          default: 2.00,
+          over_200k: 2.00
+        },
+        output: {
+          default: 10.00,
+          over_200k: 10.00
+        },
+        cache: {
+          write: 2.00,
+          read: 0.10
+        }
+      },
+
       # Google Gemini 3 series (via Vertex AI). Tiered at 200K input tokens
       # for Pro; Flash has flat pricing.
       "gemini-3.1-pro" => {
@@ -1368,6 +1388,8 @@ module Clacky
 
         # Google Gemini 3 series. Match the platform aliases (or-gemini-*)
         # and the bare upstream ids returned by Vertex.
+        when /^or-gemini-4-argon$/i, /^gemini-4-argon$/i
+          "gemini-4-argon"
         when /^or-gemini-3-1-pro$/i, /^gemini-3\.1-pro(-preview)?$/i
           "gemini-3.1-pro"
         when /^or-gemini-3-5-flash$/i, /^gemini-3\.5-flash$/i, /^gemini-3-flash(-preview)?$/i

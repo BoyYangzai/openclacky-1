@@ -1302,6 +1302,31 @@ RSpec.describe Clacky::ModelPricing do
     end
   end
 
+  describe "Gemini 4 Argon pricing" do
+    it "normalizes the platform alias or-gemini-4-argon" do
+      expect(described_class.normalize_model_name("or-gemini-4-argon")).to eq("gemini-4-argon")
+    end
+
+    it "normalizes the bare upstream id gemini-4-argon" do
+      expect(described_class.normalize_model_name("gemini-4-argon")).to eq("gemini-4-argon")
+    end
+
+    it "bills at the flat Vertex AI rates" do
+      usage = {
+        prompt_tokens: 1_000_000,
+        completion_tokens: 1_000_000,
+        cache_read_input_tokens: 200_000
+      }
+      result = described_class.calculate_cost(model: "or-gemini-4-argon", usage: usage)
+      # Regular input: (1_000_000 - 200_000)/1M * $2.00 = $1.60
+      # Cache read:     200_000 / 1M * $0.10            = $0.02
+      # Output:       1_000_000 / 1M * $10.00           = $10.00
+      # Total: $11.62
+      expect(result[:cost]).to be_within(0.0001).of(11.62)
+      expect(result[:source]).to eq(:price)
+    end
+  end
+
   describe "Gemini 3.6 Flash pricing" do
     it "bills at flat Vertex AI rates" do
       usage = {

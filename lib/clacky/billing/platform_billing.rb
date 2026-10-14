@@ -51,6 +51,7 @@ module Clacky
         "oc-kimi-k3"            => "oc-kimi-k3",
         "oc-grok-4.7"           => "oc-grok-4.7",
         # gemini chat (or-)
+        "or-gemini-4-argon"   => "gemini-4-argon",
         "or-gemini-3-1-pro"   => "gemini-3.1-pro-preview",
         "or-gemini-3-8-flash" => "gemini-3.8-flash",
         "or-gemini-3-7-flash" => "gemini-3.7-flash",
