@@ -139,6 +139,61 @@ RSpec.describe Clacky::ModelPricing do
       end
     end
 
+    context "with Claude Haiku 5.5" do
+      it "prices the sub-100K and over-100K cards separately" do
+        under = described_class.calculate_cost(
+          model: "abs-claude-haiku-5-5",
+          usage: { prompt_tokens: 50_000, completion_tokens: 10_000 }
+        )
+        # Input: (50,000 / 1,000,000) * $0.10 = $0.005
+        # Output: (10,000 / 1,000,000) * $0.50 = $0.005
+        # Total: $0.01, minus the Claude promo → $0.008
+        expect(under[:cost]).to be_within(0.0001).of(0.008)
+
+        over = described_class.calculate_cost(
+          model: "abs-claude-haiku-5-5",
+          usage: { prompt_tokens: 120_000, completion_tokens: 10_000 }
+        )
+        # Input: (120,000 / 1,000,000) * $0.50 = $0.06
+        # Output: (10,000 / 1,000,000) * $2.50 = $0.025
+        # Total: $0.085, minus the Claude promo → $0.068
+        expect(over[:cost]).to be_within(0.0001).of(0.068)
+      end
+
+      it "keeps exactly 100K on the cheap card (the cut-off is exclusive)" do
+        result = described_class.calculate_cost(
+          model: "abs-claude-haiku-5-5",
+          usage: { prompt_tokens: 100_000, completion_tokens: 0 }
+        )
+        # (100,000 / 1,000,000) * $0.10 = $0.01 → $0.008 after the promo
+        expect(result[:cost]).to be_within(0.0001).of(0.008)
+      end
+
+      it "tiers its cache rates at 100K too" do
+        usage = {
+          prompt_tokens: 120_000,
+          completion_tokens: 0,
+          cache_creation_input_tokens: 10_000,
+          cache_read_input_tokens: 20_000
+        }
+
+        # Trigger: prompt + cache write = 130,000 > 100,000
+        # Regular input: (100,000 / 1,000,000) * $0.50 = $0.05
+        #   (prompt_tokens includes the 20,000 cache reads, so they are billed below)
+        # Cache write: (10,000 / 1,000,000) * $0.625 = $0.00625
+        # Cache read: (20,000 / 1,000,000) * $0.05 = $0.001
+        # Total: $0.05725, minus the Claude promo → $0.0458
+        result = described_class.calculate_cost(model: "abs-claude-haiku-5-5", usage: usage)
+        expect(result[:cost]).to be_within(0.0001).of(0.0458)
+      end
+
+      it "does not collide with claude-haiku-4.5 (regression guard)" do
+        expect(described_class.normalize_model_name("abs-claude-haiku-5-5")).to eq("claude-haiku-5.5")
+        expect(described_class.normalize_model_name("global.anthropic.claude-haiku-5-5")).to eq("claude-haiku-5.5")
+        expect(described_class.normalize_model_name("abs-claude-haiku-4-5")).to eq("claude-haiku-4.5")
+      end
+    end
+
     context "with Claude Fable 5.1" do
       it "shares Fable 5 input/output rates but keeps its lower cache-read rate" do
         fable_5_1 = described_class.get_pricing("claude-fable-5-1")
@@ -919,6 +974,7 @@ RSpec.describe Clacky::ModelPricing do
     it "matches the whole alias family and nothing else" do
       expect(described_class.discount_rate("abs-claude-opus-5-5")).to eq(0.8)
       expect(described_class.discount_rate("abs-claude-haiku-4-5")).to eq(0.8)
+      expect(described_class.discount_rate("abs-claude-haiku-5-5")).to eq(0.8)
       expect(described_class.discount_rate("claude-opus-5-5")).to eq(1.0)
       expect(described_class.discount_rate("oc-glm-5.3")).to eq(0.95)
       expect(described_class.discount_rate("oc-kimi-k3")).to eq(0.95)

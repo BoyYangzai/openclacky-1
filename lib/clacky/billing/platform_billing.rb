@@ -42,6 +42,7 @@ module Clacky
         "abs-claude-sonnet-5"   => "global.anthropic.claude-sonnet-5",
         "abs-claude-sonnet-4-6" => "global.anthropic.claude-sonnet-4-6",
         "abs-claude-sonnet-4-5" => "global.anthropic.claude-sonnet-4-5",
+        "abs-claude-haiku-5-5"  => "global.anthropic.claude-haiku-5-5",
         "abs-claude-haiku-4-5"  => "global.anthropic.claude-haiku-4-5",
         # GLM / Kimi / Grok via TokHub (oc-). The gateway books these under the
         # alias itself, so the mapping is an identity — it exists so the billing UI

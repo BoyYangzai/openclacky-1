@@ -139,6 +139,29 @@ module Clacky
         }
       },
 
+      # Claude Haiku 5.5 (released 2026-10-07) — $0.10/MTok input and $0.50/MTok
+      # output for prompts up to 100K, then 5x those rates above it. Its
+      # breakpoint is the model's own, so the entry declares :tier_threshold and
+      # keys its tiered rates as over_100k; every other Claude entry keeps the
+      # global 200K tier.
+      "claude-haiku-5.5" => {
+        input: {
+          default: 0.10,              # $0.10/MTok for prompts ≤ 100K tokens
+          over_100k: 0.50             # $0.50/MTok for prompts > 100K tokens
+        },
+        output: {
+          default: 0.50,              # $0.50/MTok for prompts ≤ 100K tokens
+          over_100k: 2.50             # $2.50/MTok for prompts > 100K tokens
+        },
+        cache: {
+          write_default: 0.125,       # $0.125/MTok cache write (≤ 100K)
+          write_over_100k: 0.625,     # $0.625/MTok cache write (> 100K)
+          read_default: 0.01,         # $0.01/MTok cache read (≤ 100K)
+          read_over_100k: 0.05        # $0.05/MTok cache read (> 100K)
+        },
+        tier_threshold: 100_000
+      },
+
       "claude-haiku-4.5" => {
         input: {
           default: 1.00,              # $1/MTok
@@ -1113,21 +1136,26 @@ module Clacky
         cache_write_tokens = usage[:cache_creation_input_tokens] || 0
         cache_read_tokens = usage[:cache_read_input_tokens] || 0
 
-        # Determine if we're in the over_200k tier
+        # Determine which tier applies. Haiku 5.5 breaks at 100K instead of the
+        # global 200K, so an entry may declare :tier_threshold and key its
+        # tiered rates as over_<n>k (100_000 → :over_100k) — any breakpoint
+        # works without touching this method.
         # Note: prompt_tokens includes cache_read_tokens but NOT cache_write_tokens
         # cache_write_tokens are additional tokens that were written to cache
+        threshold = pricing[:tier_threshold] || TIERED_PRICING_THRESHOLD
+        tier_key = pricing[:tier_threshold] ? :"over_#{threshold / 1000}k" : :over_200k
         total_input_tokens = prompt_tokens + cache_write_tokens
-        over_threshold = total_input_tokens > TIERED_PRICING_THRESHOLD
+        over_threshold = total_input_tokens > threshold
 
         # Calculate regular input cost (non-cached tokens)
         # prompt_tokens already includes cache_read_tokens, so we need to subtract them
         # cache_write_tokens are not part of prompt_tokens, so they're handled separately in cache_cost
         regular_input_tokens = prompt_tokens - cache_read_tokens
-        input_rate = over_threshold ? pricing[:input][:over_200k] : pricing[:input][:default]
+        input_rate = over_threshold ? pricing[:input][tier_key] : pricing[:input][:default]
         input_cost = (regular_input_tokens / 1_000_000.0) * input_rate
 
         # Calculate output cost
-        output_rate = over_threshold ? pricing[:output][:over_200k] : pricing[:output][:default]
+        output_rate = over_threshold ? pricing[:output][tier_key] : pricing[:output][:default]
         output_cost = (completion_tokens / 1_000_000.0) * output_rate
 
         # Calculate cache costs
@@ -1135,7 +1163,8 @@ module Clacky
           pricing: pricing,
           cache_write_tokens: cache_write_tokens,
           cache_read_tokens: cache_read_tokens,
-          over_threshold: over_threshold
+          over_threshold: over_threshold,
+          tier_key: tier_key
         )
 
         # Promotions are keyed on the requested alias, so apply them last: the
@@ -1226,6 +1255,10 @@ module Clacky
           "claude-opus-4.5"
         when /claude.*sonnet.*4[.-]?[5-9]/i
           "claude-sonnet-4.5"
+        # Claude Haiku 5.5 (released 2026-10-07) keeps its own breakpoint (100K)
+        # and its own rates, so it must not fall through to the 4.x branch below.
+        when /claude.*haiku-5[.-]5/i
+          "claude-haiku-5.5"
         when /claude.*haiku.*4[.-]?[5-9]/i
           "claude-haiku-4.5"
         when /claude-3-5-sonnet-20241022/i
@@ -1386,7 +1419,7 @@ module Clacky
       end
 
       # Calculate cache-related costs
-      def calculate_cache_cost(pricing:, cache_write_tokens:, cache_read_tokens:, over_threshold:)
+      def calculate_cache_cost(pricing:, cache_write_tokens:, cache_read_tokens:, over_threshold:, tier_key: :over_200k)
         cache_cost = 0.0
 
         # Cache write cost
@@ -1395,8 +1428,9 @@ module Clacky
                          # Simple pricing (Opus 4.5, Haiku 4.5)
                          pricing[:cache][:write]
                        elsif over_threshold
-                         # Tiered pricing (Sonnet 4.5)
-                         pricing[:cache][:write_over_200k]
+                         # Tiered pricing (Sonnet 4.5 and friends at 200K,
+                         # Haiku 5.5 at 100K)
+                         pricing[:cache][:"write_#{tier_key}"]
                        else
                          pricing[:cache][:write_default]
                        end
@@ -1410,8 +1444,9 @@ module Clacky
                         # Simple pricing (Opus 4.5, Haiku 4.5)
                         pricing[:cache][:read]
                       elsif over_threshold
-                        # Tiered pricing (Sonnet 4.5)
-                        pricing[:cache][:read_over_200k]
+                        # Tiered pricing (Sonnet 4.5 and friends at 200K,
+                        # Haiku 5.5 at 100K)
+                        pricing[:cache][:"read_#{tier_key}"]
                       else
                         pricing[:cache][:read_default]
                       end

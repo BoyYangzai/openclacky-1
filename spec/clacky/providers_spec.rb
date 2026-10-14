@@ -101,6 +101,11 @@ RSpec.describe Clacky::Providers do
                                          model_name: "oc-grok-4.7")).to be true
       end
 
+      it "returns true for openclacky + abs-claude-haiku-5-5 (accepts image input)" do
+        expect(described_class.supports?("openclacky", :vision,
+                                         model_name: "abs-claude-haiku-5-5")).to be true
+      end
+
       it "returns true for deepseekv4 + V4.1 Flash multimodal override" do
         expect(described_class.supports?("deepseekv4", :vision)).to be false
         expect(described_class.supports?("deepseekv4", :vision,

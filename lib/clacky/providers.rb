@@ -49,6 +49,7 @@ module Clacky
           "abs-claude-sonnet-5-5",
           "abs-claude-sonnet-5",
           "abs-claude-sonnet-4-6",
+          "abs-claude-haiku-5-5",
           "abs-claude-haiku-4-5",
           "abs-gpt-6.1-sol",
           "abs-gpt-6-astra",

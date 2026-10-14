@@ -81,6 +81,14 @@ RSpec.describe Clacky::Server::ModelPrices do
         )
       end
 
+      it "prices Haiku 5.5 off its sub-100K card" do
+        result = described_class.build("abs-claude-haiku-5-5")
+
+        expect(result[:prices]["abs-claude-haiku-5-5"]).to eq(
+          in: 0.08, out: 0.40, ratio: (0.08 + 0.40) / base_total, discount: { rate: 0.8 }
+        )
+      end
+
       it "keeps the baseline at list price so the ratio stays comparable" do
         result = described_class.build("abs-claude-sonnet-5")
 
