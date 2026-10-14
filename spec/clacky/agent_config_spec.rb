@@ -1022,7 +1022,7 @@ RSpec.describe Clacky::AgentConfig do
           lite = config.lite_model_config_for_current
 
           expect(lite).not_to be_nil
-          expect(lite["model"]).to eq("abs-claude-haiku-4-5")
+          expect(lite["model"]).to eq("abs-claude-haiku-5-5")
           expect(lite["api_key"]).to eq("absk-test-key")
           expect(lite["base_url"]).to eq("https://api.openclacky.com")
           expect(lite["type"]).to eq("lite")
@@ -1033,7 +1033,7 @@ RSpec.describe Clacky::AgentConfig do
       it "returns nil when the current model IS already a lite-class model (Haiku)" do
         with_temp_config([
           {
-            "model"            => "abs-claude-haiku-4-5",
+            "model"            => "abs-claude-haiku-5-5",
             "api_key"          => "absk-test-key",
             "base_url"         => "https://api.openclacky.com",
             "anthropic_format" => false,
@@ -1095,7 +1095,7 @@ RSpec.describe Clacky::AgentConfig do
 
           # Start on Claude → lite = Haiku
           lite1 = config.lite_model_config_for_current
-          expect(lite1["model"]).to eq("abs-claude-haiku-4-5")
+          expect(lite1["model"]).to eq("abs-claude-haiku-5-5")
 
           # Switch to DSK-pro → lite follows, now V4.1 Flash
           dsk = config.models.find { |m| m["model"] == "dsk-deepseek-v4-pro" }
@@ -1187,13 +1187,13 @@ RSpec.describe Clacky::AgentConfig do
     context "openclacky (Claude-only lite_models table)" do
       it "returns Haiku for Claude-family primaries" do
         expect(Clacky::Providers.lite_model("openclacky", "abs-claude-sonnet-4-6"))
-          .to eq("abs-claude-haiku-4-5")
+          .to eq("abs-claude-haiku-5-5")
         expect(Clacky::Providers.lite_model("openclacky", "abs-claude-opus-5"))
-          .to eq("abs-claude-haiku-4-5")
+          .to eq("abs-claude-haiku-5-5")
       end
 
       it "returns nil for lite-class primaries (Haiku)" do
-        expect(Clacky::Providers.lite_model("openclacky", "abs-claude-haiku-4-5")).to be_nil
+        expect(Clacky::Providers.lite_model("openclacky", "abs-claude-haiku-5-5")).to be_nil
       end
 
       it "returns nil for models not in the lite_models table (e.g. unknown model)" do

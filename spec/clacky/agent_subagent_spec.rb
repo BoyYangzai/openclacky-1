@@ -178,7 +178,7 @@ RSpec.describe Clacky::Agent, "#fork_subagent" do
       it "routes the subagent through the lite model (Haiku) via overlay" do
         subagent = agent.fork_subagent(model: "lite")
         expect(subagent.instance_variable_get(:@config).model_name)
-          .to eq("abs-claude-haiku-4-5")
+          .to eq("abs-claude-haiku-5-5")
       end
 
       it "does NOT mutate the parent agent's current model" do
@@ -199,7 +199,7 @@ RSpec.describe Clacky::Agent, "#fork_subagent" do
 
         # Different hash instances (overlay produces a merged copy).
         expect(sub_hash).not_to be(parent_hash)
-        expect(sub_hash["model"]).to eq("abs-claude-haiku-4-5")
+        expect(sub_hash["model"]).to eq("abs-claude-haiku-5-5")
         expect(parent_hash["model"]).to eq("abs-claude-opus-4-7")
       end
 
@@ -211,7 +211,7 @@ RSpec.describe Clacky::Agent, "#fork_subagent" do
 
         subagent = agent.fork_subagent(model: "lite")
         sub_config = subagent.instance_variable_get(:@config)
-        expect(sub_config.model_name).to eq("abs-claude-haiku-4-5")
+        expect(sub_config.model_name).to eq("abs-claude-haiku-5-5")
         # base_url is preserved so the subagent still goes through the proxy.
         expect(sub_config.base_url).to eq("http://localhost:3100")
       end
