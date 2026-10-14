@@ -895,11 +895,14 @@ RSpec.describe Clacky::ModelPricing do
     it "applies the smaller TokHub discount to the oc-prefixed aliases" do
       usage = { prompt_tokens: 1_000_000, completion_tokens: 1_000_000 }
 
-      # GLM 5.3 lists at $1.142 in / $4.00 out and Kimi K3 at $3.00 / $15.00.
+      # GLM 5.3 lists at $1.142 in / $4.00 out, Kimi K3 at $3.00 / $15.00 and
+      # Grok 4.7 at $2.00 / $6.00.
       expect(described_class.calculate_cost(model: "oc-glm-5.3", usage: usage)[:cost])
         .to be_within(0.001).of(4.8849)
       expect(described_class.calculate_cost(model: "oc-kimi-k3", usage: usage)[:cost])
         .to be_within(0.001).of(17.10)
+      expect(described_class.calculate_cost(model: "oc-grok-4.7", usage: usage)[:cost])
+        .to be_within(0.001).of(7.60)
     end
 
     it "leaves the BYOK ids sitting behind those same models at list price" do
@@ -919,8 +922,10 @@ RSpec.describe Clacky::ModelPricing do
       expect(described_class.discount_rate("claude-opus-5-5")).to eq(1.0)
       expect(described_class.discount_rate("oc-glm-5.3")).to eq(0.95)
       expect(described_class.discount_rate("oc-kimi-k3")).to eq(0.95)
+      expect(described_class.discount_rate("oc-grok-4.7")).to eq(0.95)
       expect(described_class.discount_rate("glm-5.3")).to eq(1.0)
       expect(described_class.discount_rate("kimi-k3")).to eq(1.0)
+      expect(described_class.discount_rate("grok-4.7")).to eq(1.0)
       expect(described_class.discount_rate("minimax-m2.7")).to eq(1.0)
       expect(described_class.discount_rate("abs-gpt-6.1-sol")).to eq(1.0)
       expect(described_class.discount_rate(nil)).to eq(1.0)

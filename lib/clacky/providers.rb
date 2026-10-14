@@ -58,7 +58,8 @@ module Clacky
           "abs-gpt-5.6-terra",
           "abs-gpt-5.6-luna",
           "or-gemini-3-1-pro",
-          "or-gemini-3-8-flash"
+          "or-gemini-3-8-flash",
+          "oc-grok-4.7"
         ],
         # Image generation models served by the openclacky platform
         # gateway. The gateway exposes a standard OpenAI-compatible
@@ -142,7 +143,8 @@ module Clacky
         # (it accepts image/audio/video input natively via OpenRouter).
         # oc-glm-5.3 is likewise text-only: its upstream rejects any content
         # block other than `type: "text"`, so images must never be sent
-        # inline. oc-kimi-k3 is natively multimodal and keeps vision=true.
+        # inline. oc-kimi-k3 and oc-grok-4.7 are natively multimodal and keep
+        # vision=true.
         "model_capabilities" => {
           "dsk-deepseek-flash"  => { "vision" => true }.freeze,
           "dsk-deepseek-v4-pro" => { "vision" => false }.freeze,

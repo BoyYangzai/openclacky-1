@@ -418,6 +418,25 @@ module Clacky
         }
       },
 
+      # Grok 4.7 served through the openclacky gateway (oc- prefix, TokHub
+      # upstream). Official xAI list price; the long-context surcharge xAI
+      # applies above 200K prompt tokens is not passed through, so both tiers
+      # bill the same here.
+      "oc-grok-4.7" => {
+        input: {
+          default: 2.00,                   # $2.00/MTok
+          over_200k: 2.00
+        },
+        output: {
+          default: 6.00,                   # $6.00/MTok
+          over_200k: 6.00
+        },
+        cache: {
+          write: 2.00,                     # no separate write charge; bill at miss rate
+          read: 0.50                       # $0.50/MTok cache hit
+        }
+      },
+
       # Kimi K2.7 Code (256K context, multimodal coding model).
       # Source: https://platform.moonshot.ai (USD / 1M tokens)
       "kimi-k2.7-code" => {
@@ -1049,7 +1068,8 @@ module Clacky
     DISCOUNT_RULES = [
       { match: /\Aabs-claude-/,   rate: 0.8 },  # Claude series - 20% off
       { match: /\Aoc-glm-/,       rate: 0.95 }, # GLM via TokHub - 5% off
-      { match: /\Aoc-kimi-/,      rate: 0.95 }  # Kimi via TokHub - 5% off
+      { match: /\Aoc-kimi-/,      rate: 0.95 }, # Kimi via TokHub - 5% off
+      { match: /\Aoc-grok-/,      rate: 0.95 }  # Grok via TokHub - 5% off
     ].freeze
 
     class << self
